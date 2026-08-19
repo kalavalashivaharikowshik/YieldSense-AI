@@ -20,7 +20,7 @@ from app.services.weather_analysis_service import (
 )
 
 router = APIRouter(
-    prefix="/weather-analysis",
+    prefix="/api/weather-analysis",
     tags=["Weather Analysis"],
 )
 
