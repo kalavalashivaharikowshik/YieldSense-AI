@@ -42,65 +42,46 @@ The complete production system is deployed using **Microsoft Azure**, **GitHub A
 
 ---
 
-# 🌐 Live Application
+# 🌐 Live Deployment
 
 ## Web Application
 
-**YieldSense AI Web**
-
+🌐 **YieldSense AI Web App**  
 https://jolly-cliff-0c65da800.7.azurestaticapps.net
-
-Hosted using:
-
-**Azure Static Web Apps**
-
----
 
 ## Backend API
 
-**YieldSense AI API**
-
+⚙️ **YieldSense AI API**  
 https://yieldsense-api-c2c8e7fcf5hdabe2.centralindia-01.azurewebsites.net
 
-Hosted using:
-
-**Azure App Service**
-
----
-
-## Swagger API Documentation
-
+📚 **Swagger API Documentation**  
 https://yieldsense-api-c2c8e7fcf5hdabe2.centralindia-01.azurewebsites.net/docs
 
----
-
-## Health Check
-
+❤️ **API Health Check**  
 https://yieldsense-api-c2c8e7fcf5hdabe2.centralindia-01.azurewebsites.net/health
 
-Expected response:
+## 📱 Android Application
 
-```json
-{
-  "status": "healthy",
-  "service": "YieldSense AI API",
-  "version": "1.0.0"
-}
-```
+YieldSense AI is also available as an installable Android application built using
+React Native, Expo, and EAS Build.
 
----
+### Download Android App
 
-## Android Application
+📥 **Download / Install YieldSense AI APK**
 
-The Android application is built using:
+https://expo.dev/accounts/kowshuuu/projects/yieldsense-ai/builds/d395c7e5-aeb3-4219-8a02-6a39a948d22b
 
-- React Native
-- Expo SDK 54
-- Expo Application Services (EAS)
+> Open the link on an Android device and follow the installation instructions.
 
-A signed Android preview APK is generated using EAS Build.
+### Mobile Build
 
-The installed Android application communicates directly with the production FastAPI backend hosted on Azure App Service.
+- Platform: Android
+- Framework: React Native + Expo
+- Expo SDK: 54
+- Build Service: Expo EAS Build
+- Build Profile: Preview
+- Distribution: Internal
+- Backend: Azure-hosted YieldSense AI API
 
 ---
 
