@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 import joblib
+from azure.storage.blob import BlobServiceClient
 from sklearn.pipeline import Pipeline
 
+from app.core.config import settings
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 
@@ -44,6 +47,9 @@ EXPECTED_FEATURES = [
     "State",
 ]
 
+logger = logging.getLogger(
+    "yieldsense.ml.model_loader"
+)
 
 @dataclass(frozen=True)
 class YieldModelBundle:
@@ -80,17 +86,75 @@ class YieldModelBundle:
 
 def _validate_model_files() -> None:
     if not MODEL_ARTIFACT_PATH.exists():
+        _download_model_from_azure()
+
+    if not MODEL_ARTIFACT_PATH.exists():
         raise FileNotFoundError(
             "Yield prediction model artifact was not found: "
             f"{MODEL_ARTIFACT_PATH}"
         )
 
-    if not MODEL_METADATA_PATH.exists():
-        raise FileNotFoundError(
-            "Yield prediction model metadata was not found: "
-            f"{MODEL_METADATA_PATH}"
+def _download_model_from_azure() -> None:
+    """
+    Download the production model from Azure Blob Storage
+    when it is not already available locally.
+    """
+    if MODEL_ARTIFACT_PATH.exists():
+        return
+
+    connection_string = (
+        settings.AZURE_STORAGE_CONNECTION_STRING
+    )
+
+    if not connection_string:
+        raise RuntimeError(
+            "Production model is missing locally and "
+            "AZURE_STORAGE_CONNECTION_STRING is not configured."
         )
 
+    MODEL_ARTIFACT_PATH.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    logger.info(
+        "Downloading YieldSense production model "
+        "from Azure Blob Storage"
+    )
+
+    try:
+        blob_service_client = (
+            BlobServiceClient.from_connection_string(
+                connection_string
+            )
+        )
+
+        blob_client = blob_service_client.get_blob_client(
+            container=(
+                settings.AZURE_STORAGE_CONTAINER_NAME
+            ),
+            blob=(
+                settings.AZURE_ML_MODEL_BLOB_NAME
+            ),
+        )
+
+        downloader = blob_client.download_blob()
+
+        with MODEL_ARTIFACT_PATH.open("wb") as file:
+            downloader.readinto(file)
+
+    except Exception as exc:
+        if MODEL_ARTIFACT_PATH.exists():
+            MODEL_ARTIFACT_PATH.unlink()
+
+        raise RuntimeError(
+            "The YieldSense AI production model "
+            "could not be downloaded from Azure Blob Storage."
+        ) from exc
+
+    logger.info(
+        "YieldSense production model downloaded successfully"
+    )
 
 def _load_metadata() -> dict[str, Any]:
     try:
