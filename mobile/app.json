@@ -14,7 +14,6 @@
     },
     "android": {
       "package": "com.yieldsense.ai",
-
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -47,6 +46,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bf183240-6941-4c7f-9dcd-6c040f9df5a5"
+      }
     }
   }
 }
