@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import authApi from "../../api/authApi";
+import { getApiErrorMessage } from "../../utils/apiError";
+import { saveToken } from "../../utils/token";
 
 import { useAuth } from "../../hooks/useAuth";
 import Button from "../../components/common/Button";
@@ -89,12 +91,20 @@ function Profile() {
     try {
       setPasswordLoading(true);
 
-      await authApi.post("/change-password", {
+      const response = await authApi.post("/change-password", {
         old_password: passwordForm.old_password,
         new_password: passwordForm.new_password,
       });
 
-      toast.success("Password updated successfully");
+      // Changing the password signs out every other session; this one
+      // continues with the fresh token returned by the API.
+      if (response.data?.access_token) {
+        saveToken(response.data.access_token);
+      }
+
+      toast.success(
+        "Password updated. Other devices have been signed out."
+      );
 
       setPasswordForm({
         old_password: "",
@@ -103,7 +113,7 @@ function Profile() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Password update failed"
+        getApiErrorMessage(error, "Password update failed")
       );
     } finally {
       setPasswordLoading(false);
