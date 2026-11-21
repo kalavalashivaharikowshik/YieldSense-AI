@@ -14,8 +14,22 @@ def normalize_optional_text(value: str | None) -> str | None:
     return cleaned or None
 
 
-def normalize_required_text(value: str) -> str:
-    return " ".join(value.strip().split())
+def normalize_required_text(value: str | None) -> str:
+    if value is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Required text fields cannot be empty",
+        )
+
+    cleaned = " ".join(value.strip().split())
+
+    if not cleaned:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Required text fields cannot be empty",
+        )
+
+    return cleaned
 
 
 def get_farm_or_404(
