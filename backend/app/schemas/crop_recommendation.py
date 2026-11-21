@@ -41,6 +41,16 @@ class CropRecommendationOption(BaseModel):
 
     historical_record_count: int
 
+    # Units differ between crops (e.g. coconut is counted in nuts), so
+    # each option carries its own. Older saved options default to tonnes.
+    yield_unit: str = "metric tons per hectare"
+
+    production_unit: str = "metric tons"
+
+    # Where the predicted yield falls among this crop's own historical
+    # yields in the state and season (0-100).
+    historical_percentile: float | None = None
+
 
 class CropRecommendationResponse(BaseModel):
     model_config = ConfigDict(

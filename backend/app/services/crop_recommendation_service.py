@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import bisect
 import json
 import math
+import statistics
 from typing import Any
 
+import numpy as np
+import pandas as pd
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -18,15 +22,14 @@ from app.models.user import User
 from app.schemas.crop_recommendation import (
     CropRecommendationRequest,
 )
+from app.services.crop_units import get_crop_unit
+from app.services.model_scale import resolve_model_scale
 from app.services.prediction_service import (
-    PREDICTION_UNIT,
-    PRODUCTION_UNIT,
     build_model_dataframe,
     ensure_finite_number,
     get_active_accessible_farm,
     resolve_soil_reference,
     resolve_weather_reference,
-    run_yield_inference,
 )
 from app.services.prediction_validation import (
     resolve_supported_season,
@@ -36,51 +39,14 @@ from ml.model_loader import get_yield_model
 
 MAX_CANDIDATE_CROPS = 30
 MAX_ALTERNATIVES = 4
+# Crops need at least this many seasons of records to be compared.
+MIN_HISTORY_RECORDS = 3
+# Number of seasons of records that counts as fully established.
+FULL_EXPERIENCE_RECORDS = 15
 
 
 def normalize_text(value: str) -> str:
     return " ".join(value.strip().split())
-
-
-def normalize_score_values(
-    values: list[float],
-) -> list[float]:
-    """
-    Convert a collection of values into scores from
-    0 to 100 using min-max normalization.
-    """
-
-    if not values:
-        return []
-
-    finite_values = [
-        float(value)
-        for value in values
-        if math.isfinite(float(value))
-    ]
-
-    if not finite_values:
-        return [0.0 for _ in values]
-
-    minimum = min(finite_values)
-    maximum = max(finite_values)
-
-    if math.isclose(
-        minimum,
-        maximum,
-        rel_tol=1e-9,
-        abs_tol=1e-9,
-    ):
-        return [100.0 for _ in values]
-
-    return [
-        (
-            (float(value) - minimum)
-            / (maximum - minimum)
-        )
-        * 100.0
-        for value in values
-    ]
 
 
 def get_candidate_crop_statistics(
@@ -89,32 +55,19 @@ def get_candidate_crop_statistics(
     season_name: str,
 ) -> list[dict[str, Any]]:
     """
-    Find crops historically recorded for the selected
-    state and season.
+    Find crops historically grown in the selected state and season,
+    with each crop's own yield history there.
 
-    Historical averages are used for rainfall,
-    fertilizer and pesticide inputs when testing each
-    crop with the yield model.
+    Fertilizer and pesticide rates and the model's reference area come
+    from model_scale, so every crop is evaluated on the scale the model
+    was trained on.
     """
 
     rows = (
         db.query(
-            HistoricalCropYield.crop.label("crop"),
-            func.avg(
-                HistoricalCropYield.yield_value
-            ).label("average_yield"),
-            func.avg(
-                HistoricalCropYield.annual_rainfall
-            ).label("average_annual_rainfall"),
-            func.avg(
-                HistoricalCropYield.fertilizer
-            ).label("average_fertilizer"),
-            func.avg(
-                HistoricalCropYield.pesticide
-            ).label("average_pesticide"),
-            func.count(
-                HistoricalCropYield.id
-            ).label("record_count"),
+            HistoricalCropYield.crop,
+            HistoricalCropYield.yield_value,
+            HistoricalCropYield.annual_rainfall,
         )
         .filter(
             func.lower(HistoricalCropYield.state)
@@ -122,73 +75,54 @@ def get_candidate_crop_statistics(
             func.lower(HistoricalCropYield.season)
             == season_name.lower(),
             HistoricalCropYield.crop.isnot(None),
-            HistoricalCropYield.yield_value.isnot(
-                None
-            ),
+            HistoricalCropYield.yield_value.isnot(None),
         )
-        .group_by(HistoricalCropYield.crop)
-        .order_by(
-            func.count(
-                HistoricalCropYield.id
-            ).desc()
-        )
-        .limit(MAX_CANDIDATE_CROPS)
         .all()
     )
 
-    candidates: list[dict[str, Any]] = []
+    history: dict[str, dict[str, list[float]]] = {}
 
-    for row in rows:
-        required_values = (
-            row.average_yield,
-            row.average_annual_rainfall,
-            row.average_fertilizer,
-            row.average_pesticide,
+    for crop, yield_value, annual_rainfall in rows:
+        crop_name = normalize_text(crop)
+        entry = history.setdefault(
+            crop_name,
+            {"yields": [], "rainfall": []},
         )
 
-        if any(
-            value is None
-            for value in required_values
-        ):
+        if yield_value is not None and math.isfinite(yield_value):
+            entry["yields"].append(float(yield_value))
+
+        if annual_rainfall is not None and math.isfinite(annual_rainfall):
+            entry["rainfall"].append(float(annual_rainfall))
+
+    candidates: list[dict[str, Any]] = []
+
+    for crop_name, entry in history.items():
+        yields = [value for value in entry["yields"] if value >= 0]
+
+        # A crop needs a few years of history, and a non-zero typical
+        # yield, before it can be compared fairly.
+        if len(yields) < MIN_HISTORY_RECORDS or not entry["rainfall"]:
             continue
 
-        candidate = {
-            "crop": normalize_text(row.crop),
-            "historical_average_yield": (
-                ensure_finite_number(
-                    row.average_yield,
-                    "Historical average yield",
-                )
-            ),
-            "annual_rainfall": (
-                ensure_finite_number(
-                    row.average_annual_rainfall,
-                    "Historical annual rainfall",
-                )
-            ),
-            "fertilizer": ensure_finite_number(
-                row.average_fertilizer,
-                "Historical fertilizer",
-            ),
-            "pesticide": ensure_finite_number(
-                row.average_pesticide,
-                "Historical pesticide",
-            ),
-            "historical_record_count": int(
-                row.record_count or 0
-            ),
-        }
-
-        if (
-            candidate["historical_average_yield"]
-            < 0
-            or candidate["annual_rainfall"] < 0
-            or candidate["fertilizer"] < 0
-            or candidate["pesticide"] < 0
-        ):
+        if statistics.median(yields) <= 0:
             continue
 
-        candidates.append(candidate)
+        candidates.append(
+            {
+                "crop": crop_name,
+                "historical_yields": sorted(yields),
+                "historical_average_yield": statistics.fmean(yields),
+                "annual_rainfall": statistics.fmean(entry["rainfall"]),
+                "historical_record_count": len(yields),
+            }
+        )
+
+    candidates.sort(
+        key=lambda item: item["historical_record_count"],
+        reverse=True,
+    )
+    candidates = candidates[:MAX_CANDIDATE_CROPS]
 
     if not candidates:
         raise HTTPException(
@@ -196,9 +130,10 @@ def get_candidate_crop_statistics(
                 status.HTTP_422_UNPROCESSABLE_ENTITY
             ),
             detail=(
-                "No suitable historical crop records "
-                f"were found for {state_name} during "
-                f"the {season_name} season."
+                "There are not enough historical records to "
+                f"recommend a crop for {state_name} during the "
+                f"{season_name} season (each crop needs at least "
+                f"{MIN_HISTORY_RECORDS} recorded seasons)."
             ),
         )
 
@@ -301,41 +236,30 @@ def run_candidate_predictions(
     environment: dict[str, Any],
     candidates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    results: list[dict[str, Any]] = []
+    model_rows = []
+    evaluated = []
 
     for candidate in candidates:
+        model_scale = resolve_model_scale(
+            state=environment["state"],
+            crop=candidate["crop"],
+            season=environment["season"],
+        )
+
         model_values = {
-            "crop_year": environment[
-                "crop_year"
-            ],
-            "area_hectares": environment[
-                "area_hectares"
-            ],
-            "annual_rainfall": candidate[
-                "annual_rainfall"
-            ],
-            "fertilizer": candidate[
-                "fertilizer"
-            ],
-            "pesticide": candidate[
-                "pesticide"
-            ],
-            "nitrogen": environment[
-                "nitrogen"
-            ],
-            "phosphorus": environment[
-                "phosphorus"
-            ],
-            "potassium": environment[
-                "potassium"
-            ],
+            "crop_year": environment["crop_year"],
+            "annual_rainfall": candidate["annual_rainfall"],
+            "fertilizer": model_scale.typical_fertilizer_per_hectare,
+            "pesticide": model_scale.typical_pesticide_per_hectare,
+            "model_scale": model_scale,
+            "nitrogen": environment["nitrogen"],
+            "phosphorus": environment["phosphorus"],
+            "potassium": environment["potassium"],
             "ph": environment["ph"],
             "average_temperature_c": environment[
                 "average_temperature_c"
             ],
-            "total_rainfall_mm": environment[
-                "total_rainfall_mm"
-            ],
+            "total_rainfall_mm": environment["total_rainfall_mm"],
             "average_humidity_percent": environment[
                 "average_humidity_percent"
             ],
@@ -345,40 +269,14 @@ def run_candidate_predictions(
         }
 
         try:
-            model_dataframe = (
-                build_model_dataframe(
-                    model_values
-                )
-            )
-
-            predicted_yield = (
-                run_yield_inference(
-                    model_dataframe
-                )
-            )
+            model_rows.append(build_model_dataframe(model_values))
         except HTTPException:
-            # Skip a historical crop that is not
-            # compatible with the production model.
+            # Skip a historical crop the production model cannot use.
             continue
 
-        estimated_production = (
-            predicted_yield
-            * environment["area_hectares"]
-        )
+        evaluated.append(candidate)
 
-        results.append(
-            {
-                **candidate,
-                "predicted_yield": (
-                    predicted_yield
-                ),
-                "estimated_production": (
-                    estimated_production
-                ),
-            }
-        )
-
-    if not results:
+    if not evaluated:
         raise HTTPException(
             status_code=(
                 status.HTTP_422_UNPROCESSABLE_ENTITY
@@ -389,51 +287,123 @@ def run_candidate_predictions(
             ),
         )
 
+    # One batched model call instead of one call per crop.
+    predicted_yields = run_batch_yield_inference(
+        pd.concat(model_rows, ignore_index=True)
+    )
+
+    results: list[dict[str, Any]] = []
+
+    for candidate, predicted_yield in zip(
+        evaluated,
+        predicted_yields,
+        strict=True,
+    ):
+        crop_unit = get_crop_unit(candidate["crop"])
+
+        results.append(
+            {
+                **candidate,
+                "predicted_yield": predicted_yield,
+                "estimated_production": (
+                    predicted_yield * environment["area_hectares"]
+                ),
+                "yield_unit": crop_unit.yield_unit,
+                "production_unit": crop_unit.production_unit,
+            }
+        )
+
     return results
+
+
+def run_batch_yield_inference(
+    model_dataframe: pd.DataFrame,
+) -> list[float]:
+    model_bundle = get_yield_model()
+
+    try:
+        log_predictions = model_bundle.pipeline.predict(model_dataframe)
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=(
+                "The yield-prediction model could not "
+                "process the supplied inputs"
+            ),
+        ) from exc
+
+    predictions = []
+
+    for value in np.expm1(np.asarray(log_predictions, dtype=float)):
+        predictions.append(
+            max(float(value), 0.0) if math.isfinite(value) else 0.0
+        )
+
+    return predictions
+
+
+def percentile_within(values: list[float], value: float) -> float:
+    """Share of historical values at or below ``value``, from 0 to 100."""
+    if not values:
+        return 0.0
+
+    at_or_below = bisect.bisect_right(values, value)
+
+    return 100.0 * at_or_below / len(values)
 
 
 def rank_candidate_crops(
     candidates: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    predicted_scores = normalize_score_values(
-        [
-            item["predicted_yield"]
-            for item in candidates
-        ]
-    )
+    """
+    Rank crops with scores that do not depend on yield units.
 
-    historical_scores = normalize_score_values(
-        [
-            item["historical_average_yield"]
-            for item in candidates
-        ]
-    )
+    Raw yields of different crops cannot be compared: coconut is
+    counted in nuts per hectare (~8,000), sugarcane is ~50 t/ha and
+    pulses ~1 t/ha, so ranking by raw yield always picked the heaviest
+    crop. Each crop is instead compared with its own history in the same
+    state and season:
 
-    support_values = [
-        math.log1p(
-            item["historical_record_count"]
-        )
-        for item in candidates
-    ]
-
-    support_scores = normalize_score_values(
-        support_values
-    )
+    * 60% expected performance: where the predicted yield falls among
+      the crop's historical yields there (percentile).
+    * 25% reliability: how steady the crop's yield has been
+      (1 - coefficient of variation).
+    * 15% local experience: how many seasons of records exist.
+    """
 
     ranked_candidates = []
 
-    for index, candidate in enumerate(
-        candidates
-    ):
+    for candidate in candidates:
+        yields = candidate["historical_yields"]
+        mean_yield = statistics.fmean(yields)
+        spread = statistics.pstdev(yields) if len(yields) > 1 else 0.0
+        variation = spread / mean_yield if mean_yield > 0 else 1.0
+
+        performance_score = percentile_within(
+            yields,
+            candidate["predicted_yield"],
+        )
+        reliability_score = max(0.0, 1.0 - variation) * 100.0
+        experience_score = (
+            min(
+                candidate["historical_record_count"],
+                FULL_EXPERIENCE_RECORDS,
+            )
+            / FULL_EXPERIENCE_RECORDS
+            * 100.0
+        )
+
         recommendation_score = (
-            predicted_scores[index] * 0.70
-            + historical_scores[index] * 0.20
-            + support_scores[index] * 0.10
+            performance_score * 0.60
+            + reliability_score * 0.25
+            + experience_score * 0.15
         )
 
         ranked_candidates.append(
             {
                 **candidate,
+                "historical_percentile": round(performance_score, 1),
+                "reliability_score": round(reliability_score, 1),
                 "recommendation_score": round(
                     recommendation_score,
                     2,
@@ -444,7 +414,7 @@ def rank_candidate_crops(
     ranked_candidates.sort(
         key=lambda item: (
             item["recommendation_score"],
-            item["predicted_yield"],
+            item["historical_percentile"],
             item["historical_record_count"],
         ),
         reverse=True,
@@ -492,24 +462,30 @@ def create_recommendation_reasons(
 ) -> list[str]:
     reasons = [
         (
-            f"{best_crop['crop']} achieved the "
-            "highest combined recommendation score "
-            "among the eligible crops."
+            f"{best_crop['crop']} achieved the highest combined "
+            "recommendation score among the eligible crops."
         ),
         (
-            "The crop produced a strong estimated "
-            "yield under the selected farm, soil, "
-            "weather and seasonal conditions."
+            "Its predicted yield is higher than "
+            f"{best_crop['historical_percentile']:.0f}% of its own "
+            f"recorded seasons in {environment['state']} during "
+            f"{environment['season']}."
         ),
         (
-            f"It is supported by "
-            f"{best_crop['historical_record_count']} "
-            "historical records for the selected "
-            "state and season."
+            "Its yield has been "
+            + (
+                "very steady"
+                if best_crop["reliability_score"] >= 75
+                else "fairly steady"
+                if best_crop["reliability_score"] >= 50
+                else "variable"
+            )
+            + " from year to year (reliability score "
+            f"{best_crop['reliability_score']:.0f}/100)."
         ),
         (
-            "Its historical average yield contributed "
-            "positively to the final ranking."
+            f"It is supported by {best_crop['historical_record_count']} "
+            "seasons of historical records for this state and season."
         ),
         (
             f"Weather information from "
@@ -536,17 +512,17 @@ def create_recommendation_explanation(
         f"{candidate_count} historically supported "
         "crops were evaluated for "
         f"{environment['state']} during the "
-        f"{environment['season']} season. Each crop "
-        "was tested using the production yield model "
-        "with the same farm area, soil nutrients and "
-        "weather conditions. Crop-specific historical "
-        "rainfall, fertilizer and pesticide averages "
-        "were used. The final score combines 70% "
-        "predicted-yield performance, 20% historical "
-        "average-yield performance and 10% historical "
-        "record support. This recommendation should "
-        "support, not replace, professional agricultural "
-        "advice."
+        f"{environment['season']} season with the same state soil "
+        "nutrients and weather conditions, and each crop's typical "
+        "rainfall, fertilizer and pesticide rates. Because crops are "
+        "measured in different units (for example coconuts in nuts), "
+        "each crop is compared with its own history rather than with "
+        "other crops: 60% where its predicted yield falls among its "
+        "past yields in this state and season, 25% how steady its "
+        "yield has been, and 15% how many seasons of records exist. "
+        "Soil values are state averages, so they are the same for every "
+        "farm in the state. This recommendation should support, not "
+        "replace, professional agricultural advice."
     )
 
 
@@ -575,6 +551,9 @@ def serialize_ranked_crop(
         "historical_record_count": crop[
             "historical_record_count"
         ],
+        "yield_unit": crop["yield_unit"],
+        "production_unit": crop["production_unit"],
+        "historical_percentile": crop["historical_percentile"],
     }
 
 
@@ -682,8 +661,8 @@ def create_crop_recommendation(
         reasons_json=json.dumps(reasons),
         model_name=model_bundle.model_name,
         model_version=model_bundle.model_version,
-        prediction_unit=PREDICTION_UNIT,
-        production_unit=PRODUCTION_UNIT,
+        prediction_unit=best_crop["yield_unit"],
+        production_unit=best_crop["production_unit"],
         explanation=(
             create_recommendation_explanation(
                 environment=environment,
