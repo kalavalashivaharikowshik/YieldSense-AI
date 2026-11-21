@@ -35,6 +35,10 @@ def get_current_user(
 
         email = email.strip().lower()
 
+        # Tokens issued before this field existed carry no version and
+        # are treated as version 0.
+        token_version = payload.get("ver", 0)
+
     except JWTError as error:
         raise credentials_exception from error
 
@@ -46,7 +50,10 @@ def get_current_user(
 
     if user is None:
         raise credentials_exception
-    
+
+    if token_version != (user.token_version or 0):
+        raise credentials_exception
+
     if not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

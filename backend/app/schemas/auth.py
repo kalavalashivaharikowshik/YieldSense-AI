@@ -137,6 +137,12 @@ class ChangePasswordRequest(BaseModel):
         return validate_password_strength(value)
 
 
+class ChangePasswordResponse(BaseModel):
+    message: str
+    access_token: str
+    token_type: str = "bearer"
+
+
 class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

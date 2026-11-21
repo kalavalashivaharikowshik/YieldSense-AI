@@ -6,7 +6,6 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_role
 from app.core.security import (
-    create_access_token,
     hash_password,
     verify_password,
 )
@@ -14,6 +13,7 @@ from app.db.database import get_db
 from app.models.user import EmailOTP, Role, User
 from app.schemas.auth import (
     ChangePasswordRequest,
+    ChangePasswordResponse,
     ForgotPasswordRequest,
     LoginRequest,
     MessageResponse,
@@ -25,6 +25,11 @@ from app.schemas.auth import (
     UpdateProfileRequest,
     UserProfileResponse,
     VerifyOTPRequest,
+)
+from app.services.auth_service import (
+    authenticate_user,
+    issue_access_token,
+    revoke_user_sessions,
 )
 from app.services.email_service import (
     EmailDeliveryError,
@@ -188,91 +193,33 @@ def login_user(
     request: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    normalized_email = request.email.strip().lower()
-
-    user = (
-        db.query(User)
-        .filter(User.email == normalized_email)
-        .first()
-    )
-
-    if not user or not verify_password(
-        request.password,
-        user.hashed_password,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive",
-        )
-
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please verify your email before logging in",
-        )
-
-    access_token = create_access_token(
-        data={
-            "sub": user.email,
-            "role": user.role.name,
-        }
+    user = authenticate_user(
+        db=db,
+        email=request.email,
+        password=request.password,
     )
 
     return {
-        "access_token": access_token,
+        "access_token": issue_access_token(user),
         "token_type": "bearer",
     }
+
 
 @router.post("/token", response_model=TokenResponse)
 def swagger_token_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db),
 ):
-    normalized_email = form_data.username.strip().lower()
-
-    user = (
-        db.query(User)
-        .filter(User.email == normalized_email)
-        .first()
-    )
-
-    if not user or not verify_password(
-        form_data.password,
-        user.hashed_password,
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email or password",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is inactive",
-        )
-
-    if not user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Please verify your email before logging in",
-        )
-
-    access_token = create_access_token(
-        data={
-            "sub": user.email,
-            "role": user.role.name,
-        }
+    """OAuth2 form login used by the Swagger UI 'Authorize' button."""
+    user = authenticate_user(
+        db=db,
+        email=form_data.username,
+        password=form_data.password,
+        unauthorized_headers={"WWW-Authenticate": "Bearer"},
     )
 
     return {
-        "access_token": access_token,
+        "access_token": issue_access_token(user),
         "token_type": "bearer",
     }
 
@@ -386,6 +333,7 @@ def reset_password(
     user.hashed_password = hash_password(
         request.new_password
     )
+    revoke_user_sessions(user)
 
     db.commit()
 
@@ -571,7 +519,7 @@ def verify_email_otp(
         "message": "Email verified successfully",
     }
 
-@router.post("/change-password")
+@router.post("/change-password", response_model=ChangePasswordResponse)
 def change_password(
     request: ChangePasswordRequest,
     db: Session = Depends(get_db),
@@ -589,11 +537,16 @@ def change_password(
     current_user.hashed_password = hash_password(
         request.new_password
     )
+    revoke_user_sessions(current_user)
 
     db.commit()
+    db.refresh(current_user)
 
+    # Every older token is now invalid, so hand this session a fresh one.
     return {
-        "message": "Password changed successfully"
+        "message": "Password changed successfully",
+        "access_token": issue_access_token(current_user),
+        "token_type": "bearer",
     }
 
 @router.get("/admin-only")
