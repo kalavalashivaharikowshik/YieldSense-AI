@@ -1,16 +1,34 @@
-# React + Vite
+# YieldSense AI – Web App
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite front end for YieldSense AI. It talks to the FastAPI backend in
+`../backend`.
 
-Currently, two official plugins are available:
+## Setup
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+```bash
+cd web
+npm install
+cp .env.example .env   # then set VITE_API_BASE_URL
+npm run dev            # http://localhost:5173
+```
 
-## React Compiler
+`VITE_API_BASE_URL` must point at the API **including** the `/api` prefix,
+for example `http://localhost:8000/api`. The backend must list the web app's
+origin in its `CORS_ORIGINS` setting.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Scripts
 
-## Expanding the ESLint configuration
+| Command           | What it does                         |
+| ----------------- | ------------------------------------ |
+| `npm run dev`     | Start the development server         |
+| `npm run build`   | Build the production bundle (`dist`) |
+| `npm run preview` | Serve the production build locally   |
+| `npm run lint`    | Run ESLint                           |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Deployment
+
+Pushing to `main` builds and deploys the site to Azure Static Web Apps
+(`.github/workflows/azure-static-web-apps-*.yml`). The build reads
+`VITE_API_BASE_URL` from the repository secret of the same name.
+`public/staticwebapp.config.json` sends unknown paths to `index.html` so
+React Router can handle them.
