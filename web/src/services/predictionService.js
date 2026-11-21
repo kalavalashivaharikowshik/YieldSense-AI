@@ -1,47 +1,6 @@
 import apiClient from "../api/apiClient";
 import predictionApi from "../api/predictionApi";
-
-function getDownloadFilename(
-  contentDisposition,
-  fallbackFilename
-) {
-  if (!contentDisposition) {
-    return fallbackFilename;
-  }
-
-  const utf8Match = contentDisposition.match(
-    /filename\*=UTF-8''([^;]+)/
-  );
-
-  if (utf8Match?.[1]) {
-    return decodeURIComponent(
-      utf8Match[1]
-    );
-  }
-
-  const normalMatch = contentDisposition.match(
-    /filename="?([^";]+)"?/
-  );
-
-  return normalMatch?.[1] || fallbackFilename;
-}
-
-function downloadBlob(blob, filename) {
-  const downloadUrl =
-    URL.createObjectURL(blob);
-
-  const anchor =
-    document.createElement("a");
-
-  anchor.href = downloadUrl;
-  anchor.download = filename;
-
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-
-  URL.revokeObjectURL(downloadUrl);
-}
+import { downloadBlob, getDownloadFilename } from "../utils/download";
 
 async function downloadPredictionReport(
   format,
