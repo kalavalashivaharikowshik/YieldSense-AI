@@ -42,6 +42,10 @@ class Settings(BaseSettings):
     OTP_EXPIRY_MINUTES: int = 10
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_MAX_ATTEMPTS: int = 5
+    # Caps over a rolling 24 hours, per user and purpose. Without them an
+    # attacker could request a new code every minute and keep guessing.
+    OTP_MAX_SENDS_PER_DAY: int = 10
+    OTP_MAX_FAILED_ATTEMPTS_PER_DAY: int = 20
 
     model_config = SettingsConfigDict(
         env_file=".env",

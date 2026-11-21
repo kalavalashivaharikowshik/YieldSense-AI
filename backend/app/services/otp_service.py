@@ -4,6 +4,7 @@ import secrets
 from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -144,6 +145,60 @@ def ensure_resend_allowed(
         )
 
 
+def _last_24_hours() -> datetime:
+    return datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=24)
+
+
+def ensure_daily_send_limit(
+    db: Session,
+    user_id: int,
+    purpose: str,
+) -> None:
+    sent_today = (
+        db.query(func.count(EmailOTP.id))
+        .filter(
+            EmailOTP.user_id == user_id,
+            EmailOTP.purpose == purpose,
+            EmailOTP.created_at >= _last_24_hours(),
+        )
+        .scalar()
+    )
+
+    if sent_today >= settings.OTP_MAX_SENDS_PER_DAY:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Too many OTP requests today. "
+                "Please try again tomorrow."
+            ),
+        )
+
+
+def ensure_daily_failure_limit(
+    db: Session,
+    user_id: int,
+    purpose: str,
+) -> None:
+    failed_today = (
+        db.query(func.coalesce(func.sum(EmailOTP.failed_attempts), 0))
+        .filter(
+            EmailOTP.user_id == user_id,
+            EmailOTP.purpose == purpose,
+            EmailOTP.created_at >= _last_24_hours(),
+        )
+        .scalar()
+    )
+
+    if failed_today >= settings.OTP_MAX_FAILED_ATTEMPTS_PER_DAY:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Too many incorrect OTP attempts today. "
+                "Please try again tomorrow."
+            ),
+        )
+
+
 def invalidate_active_otps(
     db: Session,
     user_id: int,
@@ -178,6 +233,12 @@ def create_otp(
     validate_purpose(purpose)
 
     ensure_resend_allowed(
+        db=db,
+        user_id=user.id,
+        purpose=purpose,
+    )
+
+    ensure_daily_send_limit(
         db=db,
         user_id=user.id,
         purpose=purpose,
@@ -234,6 +295,12 @@ def verify_otp(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OTP must be a six-digit number",
         )
+
+    ensure_daily_failure_limit(
+        db=db,
+        user_id=user.id,
+        purpose=purpose,
+    )
 
     otp_record = (
         db.query(EmailOTP)
