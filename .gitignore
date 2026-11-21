@@ -46,3 +46,6 @@ ml/reports/*.txt
 backend/ml/artifacts/*.joblib
 backend/ml/artifacts/*.pkl
 backend/ml/artifacts/*.pickle
+# Lock file used while the model downloads from Azure Blob Storage
+backend/ml/artifacts/*.download.lock
+backend/ml/artifacts/.model-download-*

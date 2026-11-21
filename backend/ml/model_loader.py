@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import logging
+import os
+import tempfile
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -50,6 +54,10 @@ EXPECTED_FEATURES = [
 logger = logging.getLogger(
     "yieldsense.ml.model_loader"
 )
+
+# Serializes loading inside one process; the file lock below does the
+# same across worker processes that share the artifacts folder.
+_load_lock = threading.Lock()
 
 @dataclass(frozen=True)
 class YieldModelBundle:
@@ -117,10 +125,34 @@ def _download_model_from_azure() -> None:
         exist_ok=True,
     )
 
+    lock_path = MODEL_ARTIFACT_PATH.with_suffix(".download.lock")
+
+    with lock_path.open("w") as lock_file:
+        # Only one process downloads; the others wait and then reuse it.
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+
+        try:
+            if MODEL_ARTIFACT_PATH.exists():
+                return
+
+            _download_to_final_path(connection_string)
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
+
+
+def _download_to_final_path(connection_string: str) -> None:
     logger.info(
         "Downloading YieldSense production model "
         "from Azure Blob Storage"
     )
+
+    # Download into a temporary file and rename it when complete, so no
+    # process can ever load a half-written model file.
+    file_descriptor, temp_name = tempfile.mkstemp(
+        dir=MODEL_ARTIFACT_PATH.parent,
+        prefix=".model-download-",
+    )
+    temp_path = Path(temp_name)
 
     try:
         blob_service_client = (
@@ -138,14 +170,15 @@ def _download_model_from_azure() -> None:
             ),
         )
 
-        downloader = blob_client.download_blob()
+        downloader = blob_client.download_blob(max_concurrency=4)
 
-        with MODEL_ARTIFACT_PATH.open("wb") as file:
+        with os.fdopen(file_descriptor, "wb") as file:
             downloader.readinto(file)
 
+        os.replace(temp_path, MODEL_ARTIFACT_PATH)
+
     except Exception as exc:
-        if MODEL_ARTIFACT_PATH.exists():
-            MODEL_ARTIFACT_PATH.unlink()
+        temp_path.unlink(missing_ok=True)
 
         raise RuntimeError(
             "The YieldSense AI production model "
@@ -227,14 +260,19 @@ def _validate_metadata(
         )
 
 
-@lru_cache(maxsize=1)
 def get_yield_model() -> YieldModelBundle:
     """
     Load the production model once per backend process.
 
-    The lru_cache prevents the large Random Forest artifact
-    from being read from disk for every prediction request.
+    The lock makes concurrent first requests wait for one load instead
+    of each downloading and loading the large artifact.
     """
+    with _load_lock:
+        return _load_yield_model()
+
+
+@lru_cache(maxsize=1)
+def _load_yield_model() -> YieldModelBundle:
     _validate_model_files()
 
     metadata = _load_metadata()
@@ -283,4 +321,28 @@ def clear_yield_model_cache() -> None:
     """
     Useful for automated tests or intentional model reloads.
     """
-    get_yield_model.cache_clear()
+    _load_yield_model.cache_clear()
+
+
+def preload_yield_model_in_background() -> threading.Thread:
+    """Start loading the model without delaying API startup.
+
+    Without this, the first prediction after every restart had to wait
+    for the download and load, which could exceed client timeouts.
+    """
+
+    def load() -> None:
+        try:
+            get_yield_model()
+            logger.info("YieldSense production model preloaded")
+        except Exception:
+            logger.exception("YieldSense production model preload failed")
+
+    thread = threading.Thread(
+        target=load,
+        name="yield-model-preload",
+        daemon=True,
+    )
+    thread.start()
+
+    return thread

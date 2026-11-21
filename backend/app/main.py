@@ -23,6 +23,7 @@ from app.db.migrations import run_migrations
 from app.middleware.request_logging import (
     request_logging_middleware,
 )
+from ml.model_loader import preload_yield_model_in_background
 
 configure_logging()
 
@@ -46,6 +47,9 @@ async def lifespan(app: FastAPI):
                 "until the database schema can be upgraded"
             )
             raise
+
+    if settings.PRELOAD_MODEL_ON_STARTUP:
+        preload_yield_model_in_background()
 
     logger.info("YieldSense AI API started successfully")
 

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     AZURE_STORAGE_CONNECTION_STRING: str = ""
     AZURE_STORAGE_CONTAINER_NAME: str = "ml-models"
     AZURE_ML_MODEL_BLOB_NAME: str = "yield_prediction_pipeline.joblib"
+    # Start downloading/loading the model in the background at startup.
+    PRELOAD_MODEL_ON_STARTUP: bool = True
 
     CORS_ORIGINS: str = (
         "http://localhost:5173,"
