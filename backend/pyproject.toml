@@ -24,3 +24,7 @@ known-third-party = ["alembic"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.ruff.lint.per-file-ignores]
+# Auto-generated migration files keep Alembic's original formatting.
+"alembic/versions/*.py" = ["E501"]

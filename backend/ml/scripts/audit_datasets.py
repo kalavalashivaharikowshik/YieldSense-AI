@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-
 ML_ROOT = Path(__file__).resolve().parents[1]
 RAW_DATA_DIR = ML_ROOT / "data" / "raw"
 REPORTS_DIR = ML_ROOT / "reports"

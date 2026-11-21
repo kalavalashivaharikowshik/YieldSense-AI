@@ -1,20 +1,18 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 
 import joblib
 import numpy as np
 import pandas as pd
-
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder
-
 
 ML_ROOT = Path(__file__).resolve().parents[1]
 
@@ -209,7 +207,7 @@ def main() -> None:
     )
 
     trained_at = datetime.now(
-        timezone.utc
+        UTC
     ).isoformat()
 
     metadata = {

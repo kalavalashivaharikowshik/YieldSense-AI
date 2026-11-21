@@ -7,7 +7,6 @@ from time import perf_counter
 import joblib
 import numpy as np
 import pandas as pd
-
 from sklearn.base import clone
 from sklearn.compose import ColumnTransformer
 from sklearn.dummy import DummyRegressor
@@ -21,7 +20,6 @@ from sklearn.metrics import (
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
-
 
 ML_ROOT = Path(__file__).resolve().parents[1]
 
@@ -266,7 +264,7 @@ def main() -> None:
     print(f"Total Samples    : {len(dataframe)}")
     print(f"Training Samples : {len(X_train)}")
     print(f"Testing Samples  : {len(X_test)}")
-    print(f"Target Transform : log1p(Yield)")
+    print("Target Transform : log1p(Yield)")
 
     preprocessor = build_preprocessor()
 

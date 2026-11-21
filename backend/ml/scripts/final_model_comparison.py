@@ -7,7 +7,6 @@ from typing import Any
 
 import pandas as pd
 
-
 ML_ROOT = Path(__file__).resolve().parents[1]
 
 ARTIFACTS_DIR = ML_ROOT / "artifacts"

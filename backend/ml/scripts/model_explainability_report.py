@@ -7,7 +7,6 @@ import joblib
 import numpy as np
 import pandas as pd
 
-
 ML_ROOT = Path(__file__).resolve().parents[1]
 
 DATASET_PATH = (
@@ -433,11 +432,11 @@ def main() -> None:
 
         for factor in explanation["top_factors"]:
             lines.append(
-                (
+                
                     f"- {factor['feature']}: "
                     f"{factor['direction']} by "
                     f"{abs(factor['prediction_change']):.4f}"
-                )
+                
             )
 
         lines.append("")
