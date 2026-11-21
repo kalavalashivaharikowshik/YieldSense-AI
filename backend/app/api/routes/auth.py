@@ -76,11 +76,7 @@ async def register_user(
     db: Session = Depends(get_db),
 ):
     normalized_email = request.email.strip().lower()
-    normalized_phone = (
-        request.phone.strip()
-        if request.phone
-        else None
-    )
+    normalized_phone = request.phone
 
     existing_user = (
         db.query(User)
@@ -120,7 +116,7 @@ async def register_user(
         )
 
     user = User(
-        full_name=request.full_name.strip(),
+        full_name=request.full_name,
         email=normalized_email,
         phone=normalized_phone,
         hashed_password=hash_password(request.password),
@@ -424,7 +420,22 @@ def update_profile(
     if request.full_name is not None:
         current_user.full_name = request.full_name
 
-    if request.phone is not None:
+    if request.phone is not None and request.phone != current_user.phone:
+        phone_in_use = (
+            db.query(User.id)
+            .filter(
+                User.phone == request.phone,
+                User.id != current_user.id,
+            )
+            .first()
+        )
+
+        if phone_in_use:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Phone number is already registered",
+            )
+
         current_user.phone = request.phone
 
     db.commit()
