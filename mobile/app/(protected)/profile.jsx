@@ -18,7 +18,6 @@ import AppInput from "../../src/components/common/AppInput";
 import AppButton from "../../src/components/common/AppButton";
 import LoadingScreen from "../../src/components/common/LoadingScreen";
 
-import { authService } from "../../src/services/authService";
 import { useAuth } from "../../src/hooks/useAuth";
 import { colors } from "../../src/constants/colors";
 import { commonStyles } from "../../src/styles/commonStyles";
@@ -33,6 +32,7 @@ export default function ProfileScreen() {
     user,
     refreshUser,
     updateUserProfile,
+    changePassword,
   } = useAuth();
 
   const [profileForm, setProfileForm] = useState({
@@ -187,7 +187,7 @@ export default function ProfileScreen() {
     try {
       setPasswordLoading(true);
 
-      await authService.changePassword({
+      await changePassword({
         old_password:
           passwordForm.old_password,
 
@@ -203,7 +203,7 @@ export default function ProfileScreen() {
 
       Alert.alert(
         "Password updated",
-        "Your password was changed successfully."
+        "Your password was changed. Other devices have been signed out."
       );
     } catch (error) {
       Alert.alert(

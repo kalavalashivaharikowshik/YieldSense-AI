@@ -15,6 +15,7 @@ import {
   UsersRound,
 } from "lucide-react-native";
 
+import ConnectionErrorScreen from "../../src/components/common/ConnectionErrorScreen";
 import LoadingScreen from "../../src/components/common/LoadingScreen";
 import CustomDrawerContent from "../../src/components/navigation/CustomDrawerContent";
 import { useAuth } from "../../src/hooks/useAuth";
@@ -23,12 +24,18 @@ import { colors } from "../../src/constants/colors";
 export default function ProtectedLayout() {
   const {
     initializing,
+    connectionError,
+    retryConnection,
     isAuthenticated,
     user,
   } = useAuth();
 
   if (initializing) {
     return <LoadingScreen message="Loading account..." />;
+  }
+
+  if (!isAuthenticated && connectionError) {
+    return <ConnectionErrorScreen onRetry={retryConnection} />;
   }
 
   if (!isAuthenticated) {

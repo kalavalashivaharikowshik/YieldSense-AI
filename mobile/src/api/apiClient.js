@@ -1,7 +1,16 @@
 import { create } from "axios";
 
 import { config } from "../constants/config";
+import { sessionEvents } from "../storage/sessionEvents";
 import { tokenStorage } from "../storage/tokenStorage";
+
+// A 401 from these endpoints means wrong credentials, not an expired
+// session, so it must not sign the user out.
+const CREDENTIAL_ENDPOINTS = [
+  "/auth/login",
+  "/auth/token",
+  "/auth/change-password",
+];
 
 const apiClient = create({
   baseURL: config.apiBaseUrl,
@@ -28,8 +37,16 @@ apiClient.interceptors.request.use(
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
+    const requestUrl = error.config?.url ?? "";
+    const isCredentialCheck = CREDENTIAL_ENDPOINTS.some((endpoint) =>
+      requestUrl.endsWith(endpoint)
+    );
+
+    if (error.response?.status === 401 && !isCredentialCheck) {
       await tokenStorage.remove();
+      // Without this the app stayed on protected screens with every
+      // request failing until it was restarted.
+      sessionEvents.emitSessionExpired();
     }
 
     return Promise.reject(error);
