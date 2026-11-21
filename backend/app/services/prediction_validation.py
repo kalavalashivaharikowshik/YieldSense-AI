@@ -152,6 +152,20 @@ def get_prediction_validation_data() -> dict[str, Any]:
             ),
         }
 
+    # Fertilizer and pesticide in the dataset are totals for the whole
+    # area; the app works with rates per hectare, so keep those ranges too.
+    positive_area = dataframe[dataframe["Area"] > 0]
+
+    for feature in ("Fertilizer", "Pesticide"):
+        rates = (positive_area[feature] / positive_area["Area"]).dropna()
+
+        numeric_ranges[f"{feature}_per_hectare"] = {
+            "minimum": float(rates.min()),
+            "maximum": float(rates.max()),
+            "lower_reference": float(rates.quantile(0.005)),
+            "upper_reference": float(rates.quantile(0.995)),
+        }
+
     return {
         "crop_lookup": crop_lookup,
         "season_lookup": season_lookup,
@@ -240,13 +254,13 @@ def validate_hard_numeric_ranges(
         ),
         "fertilizer": (
             0,
-            None,
-            "Fertilizer cannot be negative",
+            2000,
+            "Fertilizer must be between 0 and 2,000 kg per hectare",
         ),
         "pesticide": (
             0,
-            None,
-            "Pesticide cannot be negative",
+            100,
+            "Pesticide must be between 0 and 100 kg per hectare",
         ),
         "nitrogen": (
             0,
@@ -374,6 +388,20 @@ def validate_model_dataframe(
         )
 
 
+FIELD_LABELS = {
+    "annual_rainfall": "Annual rainfall (mm)",
+    "fertilizer": "Fertilizer (kg per hectare)",
+    "pesticide": "Pesticide (kg per hectare)",
+    "nitrogen": "Soil nitrogen",
+    "phosphorus": "Soil phosphorus",
+    "potassium": "Soil potassium",
+    "ph": "Soil pH",
+    "average_temperature_c": "Average temperature (°C)",
+    "total_rainfall_mm": "Total rainfall (mm)",
+    "average_humidity_percent": "Average humidity (%)",
+}
+
+
 def build_prediction_warnings(
     values: dict[str, Any],
 ) -> list[str]:
@@ -409,11 +437,13 @@ def build_prediction_warnings(
             f"year. Weather data from {weather_reference_year} was used."
         )
 
+    # Farm area is not compared: the model receives the typical state
+    # area instead (see model_scale.py), and the farm's size only scales
+    # the estimated production.
     field_mapping = {
-        "area_hectares": "Area",
         "annual_rainfall": "Annual_Rainfall",
-        "fertilizer": "Fertilizer",
-        "pesticide": "Pesticide",
+        "fertilizer": "Fertilizer_per_hectare",
+        "pesticide": "Pesticide_per_hectare",
         "nitrogen": "N",
         "phosphorus": "P",
         "potassium": "K",
@@ -434,8 +464,10 @@ def build_prediction_warnings(
             or value > reference["upper_reference"]
         ):
             warnings.append(
-                f"{service_field.replace('_', ' ').title()} is "
-                "outside the range seen in most training records. "
+                f"{FIELD_LABELS.get(service_field, service_field)} "
+                f"({value:,.2f}) is outside the range seen in most "
+                f"training records ({reference['lower_reference']:,.2f}"
+                f" to {reference['upper_reference']:,.2f}). "
                 "The prediction may be less reliable."
             )
 

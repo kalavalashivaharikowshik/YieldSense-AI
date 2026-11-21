@@ -32,14 +32,22 @@ class YieldPredictionRequest(BaseModel):
         examples=["Kharif"],
     )
 
-    fertilizer: float = Field(
+    # Both are rates per hectare. Leave them out to use the typical rate
+    # for the state, crop and season in the training data.
+    fertilizer: float | None = Field(
+        default=None,
         ge=0,
-        examples=[1250.0],
+        le=2000,
+        description="Fertilizer applied, in kg per hectare.",
+        examples=[150.0],
     )
 
-    pesticide: float = Field(
+    pesticide: float | None = Field(
+        default=None,
         ge=0,
-        examples=[25.0],
+        le=100,
+        description="Pesticide applied, in kg per hectare.",
+        examples=[0.3],
     )
 
     # Optional weather values.

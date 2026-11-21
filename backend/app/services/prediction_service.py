@@ -20,6 +20,7 @@ from app.models.prediction import YieldPrediction
 from app.models.user import User
 from app.schemas.prediction import YieldPredictionRequest
 from app.services.farm_service import get_accessible_farm
+from app.services.model_scale import resolve_model_scale
 from app.services.prediction_validation import (
     build_prediction_warnings,
     resolve_supported_crop,
@@ -254,6 +255,24 @@ def resolve_prediction_inputs(
         crop_year=request.crop_year,
     )
 
+    model_scale = resolve_model_scale(
+        state=state_name,
+        crop=crop_name,
+        season=season_name,
+    )
+
+    fertilizer_per_hectare = (
+        request.fertilizer
+        if request.fertilizer is not None
+        else model_scale.typical_fertilizer_per_hectare
+    )
+
+    pesticide_per_hectare = (
+        request.pesticide
+        if request.pesticide is not None
+        else model_scale.typical_pesticide_per_hectare
+    )
+
     annual_rainfall = resolve_annual_rainfall(
         db=db,
         request=request,
@@ -338,13 +357,16 @@ def resolve_prediction_inputs(
             "Annual rainfall",
         ),
         "fertilizer": ensure_finite_number(
-            request.fertilizer,
+            fertilizer_per_hectare,
             "Fertilizer",
         ),
         "pesticide": ensure_finite_number(
-            request.pesticide,
+            pesticide_per_hectare,
             "Pesticide",
         ),
+        "fertilizer_was_defaulted": request.fertilizer is None,
+        "pesticide_was_defaulted": request.pesticide is None,
+        "model_scale": model_scale,
         "nitrogen": ensure_finite_number(
             soil.nitrogen,
             "Nitrogen",
@@ -398,14 +420,19 @@ def build_model_dataframe(
 ) -> pd.DataFrame:
     model_bundle = get_yield_model()
 
+    scaled_inputs = values["model_scale"].model_inputs(
+        fertilizer_per_hectare=values["fertilizer"],
+        pesticide_per_hectare=values["pesticide"],
+    )
+
     model_row = {
         "Crop_Year": values["crop_year"],
-        "Area": values["area_hectares"],
+        "Area": scaled_inputs["Area"],
         "Annual_Rainfall": values[
             "annual_rainfall"
         ],
-        "Fertilizer": values["fertilizer"],
-        "Pesticide": values["pesticide"],
+        "Fertilizer": scaled_inputs["Fertilizer"],
+        "Pesticide": scaled_inputs["Pesticide"],
         "N": values["nitrogen"],
         "P": values["phosphorus"],
         "K": values["potassium"],
@@ -601,10 +628,39 @@ def create_prediction_explanation(
         "with historical yield quartiles for the selected crop. "
     )
 
+    model_scale = values.get("model_scale")
+    scale_note = ""
+
+    if model_scale is not None:
+        scale_note = (
+            "Fertilizer and pesticide are rates per hectare. The model "
+            "was trained on state-level records, so it was given the "
+            f"typical area for {model_scale.basis} with your rates "
+            "applied to it; your farm's area is used to estimate "
+            "total production. "
+        )
+
+    defaulted = [
+        name
+        for name, flag in (
+            ("fertilizer", values.get("fertilizer_was_defaulted")),
+            ("pesticide", values.get("pesticide_was_defaulted")),
+        )
+        if flag
+    ]
+
+    if defaulted:
+        scale_note += (
+            "Typical historical rates were used for "
+            + " and ".join(defaulted)
+            + " because no value was entered. "
+        )
+
     return (
         "Prediction generated using the selected crop, "
-        "season, farm area, rainfall, fertilizer, pesticide, "
+        "season, rainfall, fertilizer, pesticide, "
         "state soil nutrients, temperature, and humidity. "
+        f"{scale_note}"
         f"{classification_note}"
         f"{weather_note}"
         f"{warning_note} "

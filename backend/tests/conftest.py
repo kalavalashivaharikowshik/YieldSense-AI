@@ -170,3 +170,85 @@ def farm_payload() -> dict:
         "district": "Ludhiana",
         "area_hectares": 2.5,
     }
+
+
+@pytest.fixture(scope="session")
+def small_model_path(tmp_path_factory):
+    """A small Random Forest built exactly like the production pipeline.
+
+    The real artifact lives in Azure Blob Storage, so tests train a
+    20-tree version of the same pipeline on the bundled dataset.
+    """
+    import joblib
+    import numpy as np
+    import pandas as pd
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.pipeline import Pipeline
+
+    from ml.scripts.finalize_production_model import (
+        ALL_FEATURES,
+        build_preprocessor,
+    )
+
+    dataset = pd.read_csv(
+        "ml/data/processed/yieldsense_ml_dataset.csv"
+        if os.path.exists("ml/data/processed/yieldsense_ml_dataset.csv")
+        else os.path.join(
+            os.path.dirname(__file__),
+            "..",
+            "ml/data/processed/yieldsense_ml_dataset.csv",
+        )
+    )
+    pipeline = Pipeline(
+        steps=[
+            ("preprocessor", build_preprocessor()),
+            (
+                "model",
+                RandomForestRegressor(
+                    n_estimators=20,
+                    max_features=0.5,
+                    random_state=42,
+                    n_jobs=-1,
+                ),
+            ),
+        ]
+    )
+    pipeline.fit(dataset[ALL_FEATURES], np.log1p(dataset["Yield"]))
+
+    path = tmp_path_factory.mktemp("model") / "yield_prediction_pipeline.joblib"
+    joblib.dump(pipeline, path)
+
+    return path
+
+
+@pytest.fixture
+def yield_model(small_model_path, monkeypatch):
+    from ml import model_loader
+
+    monkeypatch.setattr(model_loader, "MODEL_ARTIFACT_PATH", small_model_path)
+    model_loader.clear_yield_model_cache()
+
+    yield model_loader.get_yield_model()
+
+    model_loader.clear_yield_model_cache()
+
+
+@pytest.fixture
+def reference_data(db):
+    """Load the bundled soil, weather and yield reference datasets."""
+    from pathlib import Path
+
+    from app.services.dataset_import_service import (
+        import_historical_crop_yield,
+        import_state_soil,
+        import_state_weather,
+    )
+
+    raw = Path(__file__).resolve().parents[1] / "ml" / "data" / "raw"
+
+    import_state_soil(db=db, file_content=(raw / "state_soil.csv").read_bytes())
+    import_state_weather(db=db, file_content=(raw / "state_weather.csv").read_bytes())
+    import_historical_crop_yield(
+        db=db,
+        file_content=(raw / "historical_crop_yield.csv").read_bytes(),
+    )
