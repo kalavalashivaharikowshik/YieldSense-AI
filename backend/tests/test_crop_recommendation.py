@@ -91,3 +91,20 @@ def test_admin_cannot_create_recommendations(client, admin_headers):
     )
 
     assert response.status_code == 403
+
+
+@pytest.mark.usefixtures("yield_model", "reference_data")
+def test_recommendation_history_includes_units(client, farmer_headers):
+    farm_id = create_farm(client, farmer_headers, "Punjab")
+    client.post(
+        "/api/crop-recommendation",
+        json={"farm_id": farm_id, "season": "Rabi", "crop_year": 2020},
+        headers=farmer_headers,
+    )
+
+    history = client.get(
+        "/api/crop-recommendation/history", headers=farmer_headers
+    ).json()
+
+    assert history["total"] == 1
+    assert history["items"][0]["prediction_unit"].endswith("per hectare")

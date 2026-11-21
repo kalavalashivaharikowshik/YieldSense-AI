@@ -147,6 +147,10 @@ class CropRecommendationHistoryItem(BaseModel):
 
     estimated_production: float
 
+    prediction_unit: str = "metric tons per hectare"
+
+    production_unit: str = "metric tons"
+
     created_at: datetime
 
 
