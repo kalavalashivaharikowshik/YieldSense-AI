@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 
+import { useAuth } from "../../hooks/useAuth";
+
 
 function formatNumber(value, decimals = 2) {
   const number = Number(value);
@@ -24,7 +26,8 @@ function formatNumber(value, decimals = 2) {
 function RecentPredictions({
   predictions = [],
 }) {
-    const recentPredictions = predictions.slice(0, 3);
+  const { isFarmer } = useAuth();
+  const recentPredictions = predictions.slice(0, 3);
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
       <div className="flex items-start justify-between gap-4">
@@ -62,13 +65,15 @@ function RecentPredictions({
             here.
           </p>
 
-          <Link
-            to="/predictions"
-            className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
-          >
-            Generate Prediction
-            <ChevronRight className="h-4 w-4" />
-          </Link>
+          {isFarmer && (
+            <Link
+              to="/prediction"
+              className="mt-5 inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-700"
+            >
+              Generate Prediction
+              <ChevronRight className="h-4 w-4" />
+            </Link>
+          )}
         </div>
       ) : (
         <div className="mt-6 space-y-3">
