@@ -297,16 +297,16 @@ function PredictionDetails() {
                 icon={FlaskConical}
                 label="Fertilizer"
                 value={`${formatNumber(
-                    prediction.fertilizer
-                )} kg`}
+                  prediction.fertilizer
+                )} kg/ha`}
               />
 
               <DetailRow
                 icon={Leaf}
                 label="Pesticide"
                 value={`${formatNumber(
-                    prediction.pesticide
-                )} kg`}
+                  prediction.pesticide
+                )} kg/ha`}
               />
 
               <DetailRow
