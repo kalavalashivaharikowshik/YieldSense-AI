@@ -16,3 +16,6 @@ select = [
 ignore = [
     "B008",
 ]
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
