@@ -974,7 +974,20 @@ Farm Information
 
 # 🚀 CI/CD Pipeline
 
-YieldSense AI uses separate GitHub Actions workflows for backend and frontend deployment.
+YieldSense AI uses GitHub Actions for checks and for deployment.
+
+## Continuous Integration
+
+`.github/workflows/ci.yml` runs on every push and pull request:
+
+| Job | Checks |
+|---|---|
+| Backend | `ruff check .`, `alembic upgrade head` + `alembic check` on PostgreSQL, `pytest` on PostgreSQL |
+| Web | `npm run lint`, `npm run build` |
+| Mobile | `npx eslint .` |
+
+The deploy workflows below run their own lint/test step first, and do not
+deploy if it fails.
 
 ## Backend CI/CD
 
@@ -987,6 +1000,7 @@ GitHub Actions
      ├── Checkout Repository
      ├── Python 3.11
      ├── Install Backend Dependencies
+     ├── ruff + pytest (deploy stops on failure)
      ├── Package backend/
      │
      ▼
@@ -997,6 +1011,9 @@ Azure App Service
      │
      ▼
 yieldsense-api
+     │
+     ▼
+API startup: alembic upgrade head, then model preload
 ```
 
 Backend workflow:
@@ -1016,6 +1033,7 @@ Push to main
 GitHub Actions
      │
      ├── Checkout
+     ├── Lint + build check (deploy stops on failure)
      ├── Build React/Vite Application
      ├── Inject Production Environment
      └── Generate dist/
