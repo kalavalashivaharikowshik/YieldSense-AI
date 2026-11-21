@@ -193,18 +193,28 @@ function PredictionForm({
         "Year must be between 1990 and 2100.";
     }
 
-    validateRequiredNumber(
+    validateOptionalNumber(
       form.fertilizer,
       "fertilizer",
       nextErrors,
-      "Enter a valid fertilizer amount."
+      {
+        minimum: 0,
+        maximum: 2000,
+        message:
+          "Fertilizer must be between 0 and 2,000 kg per hectare.",
+      }
     );
 
-    validateRequiredNumber(
+    validateOptionalNumber(
       form.pesticide,
       "pesticide",
       nextErrors,
-      "Enter a valid pesticide amount."
+      {
+        minimum: 0,
+        maximum: 100,
+        message:
+          "Pesticide must be between 0 and 100 kg per hectare.",
+      }
     );
 
     validateOptionalNumber(
@@ -274,8 +284,10 @@ function PredictionForm({
       crop: form.crop,
       crop_year: Number(form.crop_year),
       season: form.season,
-      fertilizer: Number(form.fertilizer),
-      pesticide: Number(form.pesticide),
+      // Rates per hectare; left empty, the API uses the typical
+      // historical rate for the selected state, crop and season.
+      fertilizer: toOptionalNumber(form.fertilizer),
+      pesticide: toOptionalNumber(form.pesticide),
       annual_rainfall: toOptionalNumber(
         form.annual_rainfall
       ),
@@ -484,10 +496,9 @@ function PredictionForm({
           </FormField>
 
           <FormField
-            label="Fertilizer"
-            required
+            label="Fertilizer (kg per hectare)"
             error={errors.fertilizer}
-            help="Enter the amount using the same unit as the historical dataset."
+            help="Optional. Typical values are 95–195 kg/ha. Leave empty to use the usual rate for this crop and state."
           >
             <div className="relative">
               <FlaskConical
@@ -503,7 +514,7 @@ function PredictionForm({
                 value={form.fertilizer}
                 onChange={updateField}
                 disabled={submitting}
-                placeholder="Example: 1250"
+                placeholder="Example: 150"
                 className={`${fieldClass(
                   "fertilizer"
                 )} pl-11`}
@@ -512,10 +523,9 @@ function PredictionForm({
           </FormField>
 
           <FormField
-            label="Pesticide"
-            required
+            label="Pesticide (kg per hectare)"
             error={errors.pesticide}
-            help="Enter the amount using the same unit as the historical dataset."
+            help="Optional. Typical values are 0.1–0.4 kg/ha. Leave empty to use the usual rate for this crop and state."
           >
             <div className="relative">
               <Leaf
@@ -531,7 +541,7 @@ function PredictionForm({
                 value={form.pesticide}
                 onChange={updateField}
                 disabled={submitting}
-                placeholder="Example: 25"
+                placeholder="Example: 0.3"
                 className={`${fieldClass(
                   "pesticide"
                 )} pl-11`}
@@ -614,23 +624,6 @@ function FormField({
       )}
     </label>
   );
-}
-
-function validateRequiredNumber(
-  value,
-  fieldName,
-  errors,
-  message
-) {
-  const number = Number(value);
-
-  if (
-    value === "" ||
-    Number.isNaN(number) ||
-    number < 0
-  ) {
-    errors[fieldName] = message;
-  }
 }
 
 function validateOptionalNumber(
