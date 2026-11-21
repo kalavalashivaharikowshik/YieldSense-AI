@@ -6,22 +6,25 @@ from sqlalchemy import engine_from_config, pool
 from app.core.config import settings
 from app.db.database import Base
 
-# Import every model so that it is registered in Base.metadata.
-from app.models.agriculture import (
-    HistoricalCropYield,
-    StateSoilReference,
-    StateWeatherReference,
+# Import every model module so that each table is registered in
+# Base.metadata (needed for autogenerate and `alembic check`).
+from app.models import (  # noqa: F401
+    agriculture,
+    crop_recommendation,
+    farm,
+    prediction,
+    user,
 )
-from app.models.farm import Farm
-from app.models.prediction import YieldPrediction
-from app.models.crop_recommendation import CropRecommendation
-from app.models.user import EmailOTP, Role, User
-
 
 config = context.config
 
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# When migrations run from the application at startup, the application
+# has already configured logging and must keep its handlers.
+if (
+    config.config_file_name is not None
+    and config.attributes.get("configure_logger", True)
+):
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 
 # Always use the same URL as the FastAPI application.
@@ -53,6 +56,21 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    provided_connection = config.attributes.get("connection")
+
+    if provided_connection is not None:
+        context.configure(
+            connection=provided_connection,
+            target_metadata=target_metadata,
+            compare_type=True,
+            compare_server_default=True,
+        )
+
+        with context.begin_transaction():
+            context.run_migrations()
+
+        return
+
     connectable = engine_from_config(
         config.get_section(
             config.config_ini_section,

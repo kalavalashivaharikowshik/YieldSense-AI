@@ -7,6 +7,10 @@ class Settings(BaseSettings):
     ALGORITHM: str
     ACCESS_TOKEN_EXPIRE_MINUTES: int
 
+    # Apply pending Alembic migrations when the API starts. The deploy
+    # pipeline does not run migrations, so this keeps the schema in sync.
+    RUN_MIGRATIONS_ON_STARTUP: bool = True
+
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "logs/app.log"
 

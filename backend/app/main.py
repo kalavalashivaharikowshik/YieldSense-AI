@@ -19,11 +19,10 @@ from app.api.routes.crop_recommendation import (
 )
 from app.core.config import settings
 from app.core.logging_config import configure_logging
+from app.db.migrations import run_migrations
 from app.middleware.request_logging import (
     request_logging_middleware,
 )
-
-# These imports register the SQLAlchemy models for Alembic/model discovery.
 
 configure_logging()
 
@@ -38,6 +37,16 @@ cors_origins = [
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.RUN_MIGRATIONS_ON_STARTUP:
+        try:
+            run_migrations()
+        except Exception:
+            logger.exception(
+                "database_migrations_failed: the API will not start "
+                "until the database schema can be upgraded"
+            )
+            raise
+
     logger.info("YieldSense AI API started successfully")
 
     yield
