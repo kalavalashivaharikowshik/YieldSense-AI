@@ -1,4 +1,5 @@
 import math
+from collections.abc import Callable
 
 from fastapi import (
     APIRouter,
@@ -61,6 +62,9 @@ def build_options(values: list[str]) -> list[dict[str, str]]:
         }
         for value in values
     ]
+
+MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+
 
 def validate_csv_upload(file: UploadFile) -> None:
     filename = file.filename or ""
@@ -135,24 +139,26 @@ def get_farm_reference_options(
         ),
     }
 
-@router.post(
-    "/historical-yield/import",
-    response_model=DatasetImportResponse,
-)
-def import_historical_yield_dataset(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_role("admin")),
-):
+def run_csv_import(
+    file: UploadFile,
+    importer: Callable[..., dict],
+    db: Session,
+) -> dict:
     validate_csv_upload(file)
 
     try:
-        file_content = file.file.read()
+        file_content = file.file.read(MAX_UPLOAD_BYTES + 1)
 
-        return import_historical_crop_yield(
-            db=db,
-            file_content=file_content,
-        )
+        if len(file_content) > MAX_UPLOAD_BYTES:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=(
+                    "The CSV file is too large. "
+                    f"The limit is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+                ),
+            )
+
+        return importer(db=db, file_content=file_content)
 
     except DatasetImportException as error:
         raise HTTPException(
@@ -162,6 +168,18 @@ def import_historical_yield_dataset(
 
     finally:
         file.file.close()
+
+
+@router.post(
+    "/historical-yield/import",
+    response_model=DatasetImportResponse,
+)
+def import_historical_yield_dataset(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role("admin")),
+):
+    return run_csv_import(file, import_historical_crop_yield, db)
 
 
 @router.post(
@@ -173,24 +191,7 @@ def import_soil_dataset(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    validate_csv_upload(file)
-
-    try:
-        file_content = file.file.read()
-
-        return import_state_soil(
-            db=db,
-            file_content=file_content,
-        )
-
-    except DatasetImportException as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        ) from error
-
-    finally:
-        file.file.close()
+    return run_csv_import(file, import_state_soil, db)
 
 
 @router.post(
@@ -202,24 +203,8 @@ def import_weather_dataset(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
 ):
-    validate_csv_upload(file)
+    return run_csv_import(file, import_state_weather, db)
 
-    try:
-        file_content = file.file.read()
-
-        return import_state_weather(
-            db=db,
-            file_content=file_content,
-        )
-
-    except DatasetImportException as error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(error),
-        ) from error
-
-    finally:
-        file.file.close()
 
 @router.get("/historical-yield")
 def get_historical_yield_records(
