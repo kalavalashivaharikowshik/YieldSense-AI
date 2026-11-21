@@ -10,6 +10,7 @@ import { useAuth } from "../../hooks/useAuth";
 import AuthLayout from "../../layouts/AuthLayout";
 import AuthCard from "../../components/auth/AuthCard";
 import Button from "../../components/common/Button";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 function Login() {
   const navigate = useNavigate();
@@ -69,8 +70,7 @@ function Login() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Login failed"
+        getApiErrorMessage(error, "Login failed")
       );
     } finally {
       setLoading(false);

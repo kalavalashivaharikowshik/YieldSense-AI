@@ -10,6 +10,7 @@ import authApi from "../../api/authApi";
 import AuthLayout from "../../layouts/AuthLayout";
 import AuthCard from "../../components/auth/AuthCard";
 import Button from "../../components/common/Button";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const DEFAULT_COOLDOWN_SECONDS = 30;
 
@@ -118,8 +119,7 @@ function VerifyOTP() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "OTP verification failed"
+        getApiErrorMessage(error, "OTP verification failed")
       );
     } finally {
       setLoading(false);
@@ -164,8 +164,7 @@ function VerifyOTP() {
       }
 
       toast.error(
-        error.response?.data?.detail ||
-          "Unable to resend verification OTP"
+        getApiErrorMessage(error, "Unable to resend verification OTP")
       );
     } finally {
       setResending(false);

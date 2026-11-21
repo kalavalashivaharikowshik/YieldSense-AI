@@ -6,6 +6,7 @@ import { datasetService } from "../../services/datasetService";
 import DatasetUploadCard from "../../components/datasets/DatasetUploadCard";
 import ImportResult from "../../components/datasets/ImportResult";
 import DashboardLayout from "../../layouts/dashboard/DashboardLayout";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 function DatasetUpload() {
   const { user, isAdmin } = useAuth();
@@ -32,8 +33,7 @@ function DatasetUpload() {
       toast.success("Dataset imported successfully");
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Dataset import failed"
+        getApiErrorMessage(error, "Dataset import failed")
       );
     } finally {
       setLoadingType(null);

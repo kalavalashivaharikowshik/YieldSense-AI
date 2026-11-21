@@ -6,6 +6,7 @@ import authApi from "../../api/authApi";
 import AuthLayout from "../../layouts/AuthLayout";
 import AuthCard from "../../components/auth/AuthCard";
 import Button from "../../components/common/Button";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 function Register() {
   const navigate = useNavigate();
@@ -70,8 +71,7 @@ function Register() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Registration failed. Please try again."
+        getApiErrorMessage(error, "Registration failed. Please try again.")
       );
     } finally {
       setLoading(false);

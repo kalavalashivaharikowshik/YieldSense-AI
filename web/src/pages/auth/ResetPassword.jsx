@@ -10,6 +10,7 @@ import authApi from "../../api/authApi";
 import AuthLayout from "../../layouts/AuthLayout";
 import AuthCard from "../../components/auth/AuthCard";
 import Button from "../../components/common/Button";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const DEFAULT_COOLDOWN_SECONDS = 30;
 
@@ -133,8 +134,7 @@ function ResetPassword() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Password reset failed"
+        getApiErrorMessage(error, "Password reset failed")
       );
     } finally {
       setLoading(false);
@@ -182,8 +182,7 @@ function ResetPassword() {
       }
 
       toast.error(
-        error.response?.data?.detail ||
-          "Unable to resend password-reset OTP"
+        getApiErrorMessage(error, "Unable to resend password-reset OTP")
       );
     } finally {
       setResending(false);

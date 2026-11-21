@@ -18,6 +18,7 @@ import {
   getWeatherAnalysis,
   getWeatherAnalysisOptions,
 } from "../../services/weatherAnalysisService";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 
 function WeatherAnalysis() {
@@ -75,8 +76,7 @@ function WeatherAnalysis() {
         });
       } catch (error) {
         const message =
-          error.response?.data?.detail ||
-          "Unable to load weather analysis options.";
+          getApiErrorMessage(error, "Unable to load weather analysis options.");
 
         toast.error(message);
       } finally {

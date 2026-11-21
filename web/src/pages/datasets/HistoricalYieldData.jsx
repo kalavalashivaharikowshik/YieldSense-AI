@@ -11,6 +11,7 @@ import DashboardLayout from "../../layouts/dashboard/DashboardLayout";
 import SummaryCard from "../../components/datasets/SummaryCard";
 import Pagination from "../../components/datasets/Pagination";
 import { datasetService } from "../../services/datasetService";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 const PAGE_SIZE = 20;
 
@@ -67,8 +68,7 @@ function HistoricalYieldData() {
       setSummary(summaryResult);
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Failed to load historical yield data"
+        getApiErrorMessage(error, "Failed to load historical yield data")
       );
     } finally {
       setLoading(false);

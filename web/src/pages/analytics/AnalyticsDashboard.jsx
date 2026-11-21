@@ -12,6 +12,7 @@ import SeasonAnalyticsChart from "../../components/analytics/SeasonAnalyticsChar
 import StateAnalyticsChart from "../../components/analytics/StateAnalyticsChart";
 import SummaryCards from "../../components/analytics/SummaryCards";
 import { getAnalyticsDashboard } from "../../services/analyticsService";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 
 const EMPTY_ANALYTICS = {
@@ -72,10 +73,10 @@ function AnalyticsDashboard() {
           );
         }
       } catch (requestError) {
-        const message =
-          requestError?.response?.data?.detail ||
-          requestError?.message ||
-          "Unable to load analytics dashboard.";
+        const message = getApiErrorMessage(
+          requestError,
+          "Unable to load analytics dashboard."
+        );
 
         setError(message);
 

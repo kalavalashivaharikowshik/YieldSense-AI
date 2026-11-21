@@ -65,7 +65,7 @@ function Profile() {
       toast.success("Profile updated successfully");
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Profile update failed"
+        getApiErrorMessage(error, "Profile update failed")
       );
     } finally {
       setProfileLoading(false);

@@ -6,6 +6,7 @@ import authApi from "../../api/authApi";
 import AuthLayout from "../../layouts/AuthLayout";
 import AuthCard from "../../components/auth/AuthCard";
 import Button from "../../components/common/Button";
+import { getApiErrorMessage } from "../../utils/apiError";
 
 function ForgotPassword() {
   const navigate = useNavigate();
@@ -49,8 +50,7 @@ function ForgotPassword() {
       });
     } catch (error) {
       toast.error(
-        error.response?.data?.detail ||
-          "Failed to send password reset OTP"
+        getApiErrorMessage(error, "Failed to send password reset OTP")
       );
     } finally {
       setLoading(false);
