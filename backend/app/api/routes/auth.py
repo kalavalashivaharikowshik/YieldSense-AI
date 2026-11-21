@@ -4,6 +4,7 @@ from functools import partial
 import anyio
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user, require_role
@@ -164,13 +165,20 @@ def register_user(
         db.add(user)
         db.commit()
         db.refresh(user)
-    except Exception as error:
+    except IntegrityError as error:
+        # Another request registered the same email or phone in between.
         db.rollback()
 
-        logger.exception(
-            "registration_database_failed email=%s",
-            normalized_email,
-        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email address or phone number is already registered",
+        ) from error
+
+    except SQLAlchemyError as error:
+        db.rollback()
+
+        # The email is not logged, to keep personal data out of log files.
+        logger.exception("registration_database_failed")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
