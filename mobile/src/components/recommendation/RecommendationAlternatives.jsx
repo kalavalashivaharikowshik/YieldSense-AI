@@ -12,6 +12,7 @@ import {
 } from "lucide-react-native";
 
 import { colors } from "../../constants/colors";
+import { shortProductionUnit, shortYieldUnit } from "../../utils/units";
 
 function formatNumber(value, digits = 2) {
   const number = Number(value);
@@ -179,7 +180,8 @@ export default function RecommendationAlternatives({
                     <Text style={styles.metricValue}>
                       {formatNumber(
                         item.predicted_yield
-                      )}
+                      )}{" "}
+                      {shortYieldUnit(item.yield_unit)}
                     </Text>
                   </View>
                 </View>
@@ -198,7 +200,8 @@ export default function RecommendationAlternatives({
                     <Text style={styles.metricValue}>
                       {formatNumber(
                         item.estimated_production
-                      )}
+                      )}{" "}
+                      {shortProductionUnit(item.production_unit)}
                     </Text>
                   </View>
                 </View>

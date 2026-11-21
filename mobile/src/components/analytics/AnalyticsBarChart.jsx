@@ -7,6 +7,7 @@ import {
 } from "react-native";
 
 import { colors } from "../../constants/colors";
+import { shortYieldUnit } from "../../utils/units";
 
 
 function formatYield(value) {
@@ -40,6 +41,9 @@ function AnalyticsBarChart({
     averageYield: Number(
       item?.average_yield || 0
     ),
+    // Crop rows carry their own unit (coconut is in nuts/ha); state rows
+    // average tonne crops only and have no unit field.
+    yieldUnit: item?.yield_unit,
   }));
 
   const maximumValue = Math.max(
@@ -131,7 +135,7 @@ function AnalyticsBarChart({
                   {formatYield(
                     item.averageYield
                   )}{" "}
-                  t/ha
+                  {shortYieldUnit(item.yieldUnit)}
                 </Text>
               </View>
             );

@@ -12,6 +12,7 @@ import {
 } from "react-native";
 
 import { colors } from "../../constants/colors";
+import { shortProductionUnit, shortYieldUnit } from "../../utils/units";
 
 
 function formatNumber(value) {
@@ -150,7 +151,7 @@ function RecentPredictionsList({
                     {formatNumber(
                       prediction.predicted_yield
                     )}{" "}
-                    t/ha
+                    {shortYieldUnit(prediction.yield_unit)}
                   </Text>
                 </View>
 
@@ -165,7 +166,7 @@ function RecentPredictionsList({
                     {formatNumber(
                       prediction.estimated_production
                     )}{" "}
-                    t
+                    {shortProductionUnit(prediction.production_unit)}
                   </Text>
                 </View>
               </View>

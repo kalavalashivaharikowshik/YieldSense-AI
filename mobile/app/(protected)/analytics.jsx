@@ -260,7 +260,7 @@ export default function AnalyticsScreen() {
 
       <AnalyticsBarChart
         title="State Analytics"
-        description="Compare prediction activity and average yield across states."
+        description="Compare prediction activity and average yield (tonne crops only) across states."
         data={analytics.states}
         labelKey="state"
         emptyMessage="State-wise insights will appear after prediction records are generated."
