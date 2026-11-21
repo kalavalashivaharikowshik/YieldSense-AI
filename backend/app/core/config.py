@@ -34,6 +34,10 @@ class Settings(BaseSettings):
     SMTP_FROM_NAME: str = "YieldSense AI"
     SMTP_USE_TLS: bool = True
 
+    # Login brute-force protection
+    LOGIN_MAX_FAILED_ATTEMPTS: int = 5
+    LOGIN_LOCKOUT_MINUTES: int = 15
+
     # OTP security configuration
     OTP_EXPIRY_MINUTES: int = 10
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
