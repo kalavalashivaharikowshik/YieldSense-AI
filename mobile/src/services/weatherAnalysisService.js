@@ -1,57 +1,18 @@
-import { create } from "axios";
-import { config } from "../constants/config";
-import { tokenStorage } from "../storage/tokenStorage";
+import apiClient from "../api/apiClient";
 
-const backendRootUrl =
-  config.apiBaseUrl.replace(/\/api\/?$/, "");
-
-const weatherApi = create({
-  baseURL: `${backendRootUrl}/weather-analysis`,
-  timeout: 30000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
-
-weatherApi.interceptors.request.use(
-  async (requestConfig) => {
-    const token = await tokenStorage.get();
-
-    if (token) {
-      requestConfig.headers.Authorization =
-        `Bearer ${token}`;
-    }
-
-    return requestConfig;
-  },
-  (error) => Promise.reject(error)
-);
-
-weatherApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    if (error.response?.status === 401) {
-      await tokenStorage.remove();
-    }
-
-    return Promise.reject(error);
-  }
-);
+// The API serves weather analysis under /api/weather-analysis. The base
+// URL already ends in /api, so the shared client is used directly. The
+// old code stripped /api and called /weather-analysis, which returned
+// 404 after the backend route moved under /api.
 
 export async function getWeatherAnalysisOptions() {
-  const response = await weatherApi.get(
-    "/options"
-  );
+  const response = await apiClient.get("/weather-analysis/options");
 
   return response.data;
 }
 
-export async function getWeatherAnalysis({
-  state,
-  startYear,
-  endYear,
-}) {
-  const response = await weatherApi.get("", {
+export async function getWeatherAnalysis({ state, startYear, endYear }) {
+  const response = await apiClient.get("/weather-analysis", {
     params: {
       state,
       start_year: startYear,
