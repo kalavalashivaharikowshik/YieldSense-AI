@@ -77,6 +77,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    # The web app runs on a different origin, so browsers hide these
+    # headers unless they are exposed. Content-Disposition carries the
+    # report file name for CSV/PDF downloads.
+    expose_headers=["Content-Disposition", "X-Request-ID"],
 )
 
 
