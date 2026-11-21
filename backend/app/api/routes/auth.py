@@ -45,6 +45,17 @@ from app.services.otp_service import (
 
 logger = logging.getLogger(__name__)
 
+# The same responses are returned whether or not an account exists, so
+# these endpoints cannot be used to find out which emails are registered.
+PASSWORD_RESET_SENT_MESSAGE = (
+    "If an account exists for this email, a password reset code has been sent."
+)
+VERIFICATION_SENT_MESSAGE = (
+    "If this email belongs to an unverified account, "
+    "a verification code has been sent."
+)
+NO_ACTIVE_OTP_MESSAGE = "No active OTP was found. Please request a new OTP."
+
 router = APIRouter(
     prefix="/api/auth",
     tags=["Authentication"]
@@ -247,17 +258,10 @@ async def forgot_password(
         .first()
     )
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account was found with this email address",
-        )
+    if not user or not user.is_active:
+        logger.info("password_reset_requested_for_unknown_or_inactive_account")
 
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive",
-        )
+        return {"message": PASSWORD_RESET_SENT_MESSAGE}
 
     otp_code = create_otp(
         db=db,
@@ -292,9 +296,7 @@ async def forgot_password(
             ),
         ) from error
 
-    return {
-        "message": "Password reset OTP sent successfully",
-    }
+    return {"message": PASSWORD_RESET_SENT_MESSAGE}
 @router.post(
     "/reset-password",
     response_model=MessageResponse,
@@ -311,16 +313,10 @@ def reset_password(
         .first()
     )
 
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account was found with this email address",
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=NO_ACTIVE_OTP_MESSAGE,
         )
 
     verify_otp(
@@ -415,23 +411,8 @@ async def send_verification_otp(
         .first()
     )
 
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account was found with this email address",
-        )
-
-    if user.is_verified:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="This email address is already verified",
-        )
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive",
-        )
+    if not user or user.is_verified or not user.is_active:
+        return {"message": VERIFICATION_SENT_MESSAGE}
 
     otp_code = create_otp(
         db=db,
@@ -466,9 +447,7 @@ async def send_verification_otp(
             ),
         ) from error
 
-    return {
-        "message": "Verification OTP sent successfully",
-    }
+    return {"message": VERIFICATION_SENT_MESSAGE}
 
 @router.post(
     "/verify-otp",
@@ -486,22 +465,16 @@ def verify_email_otp(
         .first()
     )
 
-    if not user:
+    if not user or not user.is_active:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No account was found with this email address",
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=NO_ACTIVE_OTP_MESSAGE,
         )
 
     if user.is_verified:
         return {
             "message": "Email address is already verified",
         }
-
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account is inactive",
-        )
 
     verify_otp(
         db=db,
