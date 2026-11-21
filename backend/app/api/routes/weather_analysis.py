@@ -9,6 +9,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_current_user
 from app.db.database import get_db
 from app.schemas.weather_analysis import (
     WeatherAnalysisOptionsResponse,
@@ -22,6 +23,8 @@ from app.services.weather_analysis_service import (
 router = APIRouter(
     prefix="/api/weather-analysis",
     tags=["Weather Analysis"],
+    # Every other data endpoint requires a signed-in user; these did not.
+    dependencies=[Depends(get_current_user)],
 )
 
 
