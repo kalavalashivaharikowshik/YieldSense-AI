@@ -308,17 +308,17 @@ export default function PredictionDetailsScreen() {
         <DetailRow
           icon={FlaskConical}
           label="Fertilizer"
-          value={formatNumber(
+          value={`${formatNumber(
             prediction.fertilizer
-          )}
+          )} kg/ha`}
         />
 
         <DetailRow
           icon={Leaf}
           label="Pesticide"
-          value={formatNumber(
+          value={`${formatNumber(
             prediction.pesticide
-          )}
+          )} kg/ha`}
         />
 
         <DetailRow

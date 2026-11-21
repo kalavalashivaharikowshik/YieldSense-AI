@@ -279,18 +279,28 @@ export default function PredictionForm({
         "Year must be between 1990 and 2100.";
     }
 
-    validateNonNegativeNumber(
+    validateOptionalNumber(
       form.fertilizer,
       "fertilizer",
       nextErrors,
-      "Enter a valid fertilizer amount."
+      {
+        minimum: 0,
+        maximum: 2000,
+        message:
+          "Fertilizer must be between 0 and 2,000 kg per hectare.",
+      }
     );
 
-    validateNonNegativeNumber(
+    validateOptionalNumber(
       form.pesticide,
       "pesticide",
       nextErrors,
-      "Enter a valid pesticide amount."
+      {
+        minimum: 0,
+        maximum: 100,
+        message:
+          "Pesticide must be between 0 and 100 kg per hectare.",
+      }
     );
 
     validateOptionalNumber(
@@ -370,8 +380,9 @@ export default function PredictionForm({
       crop: form.crop,
       crop_year: Number(form.crop_year),
       season: form.season,
-      fertilizer: Number(form.fertilizer),
-      pesticide: Number(form.pesticide),
+      // Rates per hectare; empty means "use the typical rate".
+      fertilizer: toOptionalNumber(form.fertilizer),
+      pesticide: toOptionalNumber(form.pesticide),
 
       annual_rainfall: toOptionalNumber(
         form.annual_rainfall
@@ -511,14 +522,13 @@ export default function PredictionForm({
           />
 
           <AppInput
-            label="Fertilizer"
-            required
+            label="Fertilizer (kg per hectare)"
             value={form.fertilizer}
             onChangeText={(value) =>
               updateField("fertilizer", value)
             }
             keyboardType="decimal-pad"
-            placeholder="Example: 1250 kg"
+            placeholder="Example: 150"
             editable={!submitting}
             error={errors.fertilizer}
             leftIcon={
@@ -530,20 +540,19 @@ export default function PredictionForm({
           />
 
           <Text style={styles.helpText}>
-            Enter the fertilizer amount using the
-            same unit used in your agricultural
-            records.
+            Optional. Typical values are 95–195 kg
+            per hectare. Leave empty to use the usual
+            rate for this crop and state.
           </Text>
 
           <AppInput
-            label="Pesticide"
-            required
+            label="Pesticide (kg per hectare)"
             value={form.pesticide}
             onChangeText={(value) =>
               updateField("pesticide", value)
             }
             keyboardType="decimal-pad"
-            placeholder="Example: 25 kg"
+            placeholder="Example: 0.3"
             editable={!submitting}
             error={errors.pesticide}
             leftIcon={
@@ -960,23 +969,6 @@ function OptionSelectorModal({
       </View>
     </Modal>
   );
-}
-
-function validateNonNegativeNumber(
-  value,
-  field,
-  errors,
-  message
-) {
-  const number = Number(value);
-
-  if (
-    value === "" ||
-    Number.isNaN(number) ||
-    number < 0
-  ) {
-    errors[field] = message;
-  }
 }
 
 function validateOptionalNumber(
