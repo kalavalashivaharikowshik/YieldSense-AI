@@ -139,7 +139,7 @@ def get_farm_reference_options(
     "/historical-yield/import",
     response_model=DatasetImportResponse,
 )
-async def import_historical_yield_dataset(
+def import_historical_yield_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
@@ -147,7 +147,7 @@ async def import_historical_yield_dataset(
     validate_csv_upload(file)
 
     try:
-        file_content = await file.read()
+        file_content = file.file.read()
 
         return import_historical_crop_yield(
             db=db,
@@ -161,14 +161,14 @@ async def import_historical_yield_dataset(
         ) from error
 
     finally:
-        await file.close()
+        file.file.close()
 
 
 @router.post(
     "/soil/import",
     response_model=DatasetImportResponse,
 )
-async def import_soil_dataset(
+def import_soil_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
@@ -176,7 +176,7 @@ async def import_soil_dataset(
     validate_csv_upload(file)
 
     try:
-        file_content = await file.read()
+        file_content = file.file.read()
 
         return import_state_soil(
             db=db,
@@ -190,14 +190,14 @@ async def import_soil_dataset(
         ) from error
 
     finally:
-        await file.close()
+        file.file.close()
 
 
 @router.post(
     "/weather/import",
     response_model=DatasetImportResponse,
 )
-async def import_weather_dataset(
+def import_weather_dataset(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role("admin")),
@@ -205,7 +205,7 @@ async def import_weather_dataset(
     validate_csv_upload(file)
 
     try:
-        file_content = await file.read()
+        file_content = file.file.read()
 
         return import_state_weather(
             db=db,
@@ -219,7 +219,7 @@ async def import_weather_dataset(
         ) from error
 
     finally:
-        await file.close()
+        file.file.close()
 
 @router.get("/historical-yield")
 def get_historical_yield_records(

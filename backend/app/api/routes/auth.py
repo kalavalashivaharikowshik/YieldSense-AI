@@ -1,5 +1,7 @@
 import logging
+from functools import partial
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
@@ -62,6 +64,23 @@ router = APIRouter(
 )
 
 
+def send_email_from_worker_thread(send_function, user: User, otp_code: str) -> None:
+    """Run an async email sender from a sync endpoint.
+
+    These endpoints are plain functions so FastAPI runs them in its
+    thread pool; database work then no longer blocks the event loop that
+    serves every other request.
+    """
+    anyio.from_thread.run(
+        partial(
+            send_function,
+            recipient_email=user.email,
+            recipient_name=user.full_name,
+            otp_code=otp_code,
+        )
+    )
+
+
 def deactivate_latest_otp_after_email_failure(
     db: Session,
     user_id: int,
@@ -87,7 +106,7 @@ def deactivate_latest_otp_after_email_failure(
     response_model=RegisterResponse,
     status_code=status.HTTP_201_CREATED,
 )
-async def register_user(
+def register_user(
     request: RegisterRequest,
     db: Session = Depends(get_db),
 ):
@@ -165,10 +184,10 @@ async def register_user(
             purpose=EMAIL_VERIFICATION_PURPOSE,
         )
 
-        await send_verification_otp_email(
-            recipient_email=user.email,
-            recipient_name=user.full_name,
-            otp_code=otp_code,
+        send_email_from_worker_thread(
+            send_verification_otp_email,
+            user,
+            otp_code,
         )
 
     except EmailDeliveryError as error:
@@ -246,7 +265,7 @@ def logout_user():
     "/forgot-password",
     response_model=MessageResponse,
 )
-async def forgot_password(
+def forgot_password(
     request: ForgotPasswordRequest,
     db: Session = Depends(get_db),
 ):
@@ -270,10 +289,10 @@ async def forgot_password(
     )
 
     try:
-        await send_password_reset_otp_email(
-            recipient_email=user.email,
-            recipient_name=user.full_name,
-            otp_code=otp_code,
+        send_email_from_worker_thread(
+            send_password_reset_otp_email,
+            user,
+            otp_code,
         )
 
     except EmailDeliveryError as error:
@@ -399,7 +418,7 @@ def update_profile(
     "/send-otp",
     response_model=MessageResponse,
 )
-async def send_verification_otp(
+def send_verification_otp(
     request: SendOTPRequest,
     db: Session = Depends(get_db),
 ):
@@ -421,10 +440,10 @@ async def send_verification_otp(
     )
 
     try:
-        await send_verification_otp_email(
-            recipient_email=user.email,
-            recipient_name=user.full_name,
-            otp_code=otp_code,
+        send_email_from_worker_thread(
+            send_verification_otp_email,
+            user,
+            otp_code,
         )
 
     except EmailDeliveryError as error:
