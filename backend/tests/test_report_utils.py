@@ -16,3 +16,18 @@ def test_pdf_handles_markup_characters(farm_name):
     )
 
     assert buffer.getvalue().startswith(b"%PDF")
+
+
+def test_csv_neutralizes_formulas():
+    from app.reports.report_utils import create_csv_buffer
+
+    buffer = create_csv_buffer(
+        headers=["Farm", "Change"],
+        rows=[['=HYPERLINK("http://evil","x")', -3.5], ["@SUM(A1)", 2]],
+    )
+    text = buffer.getvalue().decode("utf-8-sig")
+
+    assert "'=HYPERLINK" in text
+    assert "'@SUM(A1)" in text
+    assert "-3.5000" in text
+    assert "'-3.5000" not in text

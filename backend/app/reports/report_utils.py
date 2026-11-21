@@ -63,6 +63,27 @@ def pdf_text(value: Any) -> str:
     return escape(normalize_value(value))
 
 
+FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def csv_text(value: Any) -> str:
+    """Neutralize spreadsheet formulas in exported text.
+
+    A cell starting with =, +, -, @ is run as a formula by Excel and
+    Google Sheets, so a farm named '=HYPERLINK(...)' would become a live
+    link in an admin's export. Numbers are left untouched.
+    """
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return normalize_value(value)
+
+    text = normalize_value(value)
+
+    if text.startswith(FORMULA_PREFIXES):
+        return f"'{text}"
+
+    return text
+
+
 def create_csv_buffer(
     headers: Sequence[str],
     rows: Iterable[Sequence[Any]],
@@ -75,7 +96,7 @@ def create_csv_buffer(
 
     for row in rows:
         writer.writerow(
-            [normalize_value(value) for value in row]
+            [csv_text(value) for value in row]
         )
 
     byte_buffer = BytesIO(
