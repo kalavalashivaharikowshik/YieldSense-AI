@@ -4,6 +4,7 @@ from typing import Any
 
 import pandas as pd
 from pandas.errors import ParserError
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.models.agriculture import (
@@ -127,6 +128,23 @@ def read_csv_file(file_content: bytes) -> pd.DataFrame:
     return dataframe
 
 
+def commit_import(db: Session) -> None:
+    try:
+        db.commit()
+    except SQLAlchemyError as error:
+        db.rollback()
+
+        raise DatasetImportException(
+            "The data could not be saved. No rows were imported. "
+            f"Database error: {error.__class__.__name__}"
+        ) from error
+
+
+def ensure_not_negative(value: float | None, field_name: str) -> None:
+    if value is not None and value < 0:
+        raise ValueError(f"{field_name} cannot be negative")
+
+
 def validate_columns(
     dataframe: pd.DataFrame,
     required_columns: set[str],
@@ -168,6 +186,20 @@ def import_historical_crop_yield(
     invalid_rows = 0
     errors = []
 
+    # One query for every existing key instead of one query per CSV row.
+    # The set also catches duplicate rows inside the same file, which
+    # previously hit the unique constraint and aborted the whole import.
+    known_keys = {
+        tuple(key)
+        for key in db.query(
+            HistoricalCropYield.crop,
+            HistoricalCropYield.crop_year,
+            HistoricalCropYield.season,
+            HistoricalCropYield.state,
+            HistoricalCropYield.area,
+        ).all()
+    }
+
     for dataframe_index, row in dataframe.iterrows():
         csv_row_number = int(dataframe_index) + 2
 
@@ -205,27 +237,20 @@ def import_historical_crop_yield(
             )
             yield_value = to_float(row["yield"], "Yield")
 
-            if area is not None and area < 0:
-                raise ValueError("Area cannot be negative")
+            ensure_not_negative(area, "Area")
+            ensure_not_negative(production, "Production")
+            ensure_not_negative(annual_rainfall, "Annual_Rainfall")
+            ensure_not_negative(fertilizer, "Fertilizer")
+            ensure_not_negative(pesticide, "Pesticide")
+            ensure_not_negative(yield_value, "Yield")
 
-            if production is not None and production < 0:
-                raise ValueError("Production cannot be negative")
+            record_key = (crop, crop_year, season, state, area)
 
-            existing_record = (
-                db.query(HistoricalCropYield)
-                .filter(
-                    HistoricalCropYield.crop == crop,
-                    HistoricalCropYield.crop_year == crop_year,
-                    HistoricalCropYield.season == season,
-                    HistoricalCropYield.state == state,
-                    HistoricalCropYield.area == area,
-                )
-                .first()
-            )
-
-            if existing_record:
+            if record_key in known_keys:
                 skipped_rows += 1
                 continue
+
+            known_keys.add(record_key)
 
             record = HistoricalCropYield(
                 crop=crop,
@@ -252,11 +277,7 @@ def import_historical_crop_yield(
                 }
             )
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    commit_import(db)
 
     return {
         "dataset": "historical_crop_yield",
@@ -290,6 +311,9 @@ def import_state_soil(
     skipped_rows = 0
     invalid_rows = 0
     errors = []
+    # Rows added earlier in this file, so a repeated state is updated
+    # instead of inserted twice.
+    pending_records = {}
 
     for dataframe_index, row in dataframe.iterrows():
         csv_row_number = int(dataframe_index) + 2
@@ -308,7 +332,11 @@ def import_state_soil(
             if ph is not None and not 0 <= ph <= 14:
                 raise ValueError("pH must be between 0 and 14")
 
-            existing_record = (
+            ensure_not_negative(nitrogen, "N")
+            ensure_not_negative(phosphorus, "P")
+            ensure_not_negative(potassium, "K")
+
+            existing_record = pending_records.get(state) or (
                 db.query(StateSoilReference)
                 .filter(StateSoilReference.state == state)
                 .first()
@@ -343,6 +371,7 @@ def import_state_soil(
             )
 
             db.add(record)
+            pending_records[state] = record
             inserted_rows += 1
 
         except ValueError as error:
@@ -354,11 +383,7 @@ def import_state_soil(
                 }
             )
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    commit_import(db)
 
     return {
         "dataset": "state_soil",
@@ -392,6 +417,9 @@ def import_state_weather(
     skipped_rows = 0
     invalid_rows = 0
     errors = []
+    # Rows added earlier in this file, so a repeated state is updated
+    # instead of inserted twice.
+    pending_records = {}
 
     for dataframe_index, row in dataframe.iterrows():
         csv_row_number = int(dataframe_index) + 2
@@ -429,7 +457,7 @@ def import_state_weather(
                     "Average humidity must be between 0 and 100"
                 )
 
-            existing_record = (
+            existing_record = pending_records.get((state, year)) or (
                 db.query(StateWeatherReference)
                 .filter(
                     StateWeatherReference.state == state,
@@ -471,6 +499,7 @@ def import_state_weather(
             )
 
             db.add(record)
+            pending_records[(state, year)] = record
             inserted_rows += 1
 
         except ValueError as error:
@@ -482,11 +511,7 @@ def import_state_weather(
                 }
             )
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    commit_import(db)
 
     return {
         "dataset": "state_weather",
