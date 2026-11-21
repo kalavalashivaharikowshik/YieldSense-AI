@@ -77,3 +77,26 @@ def test_out_of_range_rate_is_rejected_or_warned(client, farmer_headers):
     assert too_much.status_code == 422
     assert unusual.status_code == 201
     assert "Fertilizer (kg per hectare)" in unusual.json()["explanation"]
+
+
+@pytest.mark.usefixtures("yield_model", "reference_data")
+def test_units_follow_the_crop(client, farmer_headers):
+    kerala = create_farm(client, farmer_headers, "Kerala", 2)
+    punjab = create_farm(client, farmer_headers, "Punjab", 2)
+
+    coconut = predict(client, farmer_headers, kerala).json()
+    wheat = predict(
+        client, farmer_headers, punjab, crop="Wheat", season="Rabi"
+    ).json()
+
+    assert coconut["prediction_unit"] == "nuts per hectare"
+    assert coconut["production_unit"] == "nuts"
+    assert wheat["prediction_unit"] == "metric tons per hectare"
+
+
+def test_crop_unit_lookup():
+    from app.services.crop_units import get_crop_unit
+
+    assert get_crop_unit("Cotton(Lint)").production_unit.startswith("bales")
+    assert get_crop_unit(" coconut ").production_unit == "nuts"
+    assert get_crop_unit("Rice").is_tonnes

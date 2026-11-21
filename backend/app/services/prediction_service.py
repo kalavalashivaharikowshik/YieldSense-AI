@@ -19,6 +19,7 @@ from app.models.farm import Farm
 from app.models.prediction import YieldPrediction
 from app.models.user import User
 from app.schemas.prediction import YieldPredictionRequest
+from app.services.crop_units import get_crop_unit
 from app.services.farm_service import get_accessible_farm
 from app.services.model_scale import resolve_model_scale
 from app.services.prediction_validation import (
@@ -31,6 +32,8 @@ from app.services.prediction_validation import (
 )
 from ml.model_loader import get_yield_model
 
+# Default units; crops counted differently (coconut, cotton, jute, mesta)
+# get their own units from crop_units.get_crop_unit.
 PREDICTION_UNIT = "metric tons per hectare"
 PRODUCTION_UNIT = "metric tons"
 
@@ -706,6 +709,7 @@ def create_yield_prediction(
     )
 
     model_bundle = get_yield_model()
+    crop_unit = get_crop_unit(values["crop"])
 
     prediction = YieldPrediction(
         user_id=current_user.id,
@@ -753,8 +757,8 @@ def create_yield_prediction(
         ],
         model_name=model_bundle.model_name,
         model_version=model_bundle.model_version,
-        prediction_unit=PREDICTION_UNIT,
-        production_unit=PRODUCTION_UNIT,
+        prediction_unit=crop_unit.yield_unit,
+        production_unit=crop_unit.production_unit,
         explanation=create_prediction_explanation(
             values,
             yield_classification,
