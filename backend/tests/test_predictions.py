@@ -122,3 +122,14 @@ def test_explanation_reports_manual_weather(client, farmer_headers):
 
     assert "supplied directly" in manual["explanation"]
     assert "Weather reference year" in automatic["explanation"]
+
+
+@pytest.mark.usefixtures("yield_model", "reference_data")
+def test_yield_category_uses_state_history(client, farmer_headers):
+    farm_id = create_farm(client, farmer_headers, "Punjab", 2)
+
+    result = predict(
+        client, farmer_headers, farm_id, crop="Wheat", season="Rabi"
+    ).json()
+
+    assert "selected crop in Punjab" in result["explanation"]

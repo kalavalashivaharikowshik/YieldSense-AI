@@ -512,14 +512,47 @@ def run_yield_inference(
 
     return predicted_yield
 
+def _historical_yields(
+    db: Session,
+    crop_name: str,
+    state_name: str | None,
+) -> list[float]:
+    query = db.query(HistoricalCropYield.yield_value).filter(
+        func.lower(HistoricalCropYield.crop)
+        == crop_name.strip().lower(),
+        HistoricalCropYield.yield_value.isnot(None),
+    )
+
+    if state_name is not None:
+        query = query.filter(
+            func.lower(HistoricalCropYield.state)
+            == state_name.strip().lower()
+        )
+
+    return [
+        float(row[0])
+        for row in query.all()
+        if row[0] is not None
+        and math.isfinite(float(row[0]))
+        and float(row[0]) >= 0
+    ]
+
+
+# A state needs this many records of a crop before its own history is
+# used for the yield category; otherwise all states are used.
+MIN_STATE_RECORDS_FOR_CLASSIFICATION = 8
+
+
 def classify_predicted_yield(
     db: Session,
     crop_name: str,
     predicted_yield: float,
+    state_name: str | None = None,
 ) -> dict[str, Any]:
     """
-    Classify the prediction relative to historical
-    yield values for the selected crop.
+    Classify the prediction relative to historical yield values for the
+    selected crop, in the same state when enough records exist (yields
+    differ a lot between states, e.g. Punjab wheat vs. Karnataka wheat).
 
     Categories:
     below Q1       -> Low
@@ -528,23 +561,16 @@ def classify_predicted_yield(
     Q3 and above   -> Excellent
     """
 
-    historical_values = (
-        db.query(HistoricalCropYield.yield_value)
-        .filter(
-            func.lower(HistoricalCropYield.crop)
-            == crop_name.strip().lower(),
-            HistoricalCropYield.yield_value.isnot(None),
-        )
-        .all()
-    )
+    yield_values: list[float] = []
+    comparison_scope = "all states"
 
-    yield_values = [
-        float(row[0])
-        for row in historical_values
-        if row[0] is not None
-        and math.isfinite(float(row[0]))
-        and float(row[0]) >= 0
-    ]
+    if state_name:
+        yield_values = _historical_yields(db, crop_name, state_name)
+        comparison_scope = state_name
+
+    if len(yield_values) < MIN_STATE_RECORDS_FOR_CLASSIFICATION:
+        yield_values = _historical_yields(db, crop_name, None)
+        comparison_scope = "all states"
 
     if len(yield_values) < 4:
         raise HTTPException(
@@ -600,6 +626,7 @@ def classify_predicted_yield(
             6,
         ),
         "historical_q3": round(float(q3), 6),
+        "comparison_scope": comparison_scope,
     }
 
 def create_prediction_explanation(
@@ -635,7 +662,8 @@ def create_prediction_explanation(
     classification_note = (
         f"The result is classified as "
         f"{yield_classification['label']} by comparing it "
-        "with historical yield quartiles for the selected crop. "
+        "with historical yield quartiles for the selected crop in "
+        f"{yield_classification.get('comparison_scope', 'all states')}. "
     )
 
     model_scale = values.get("model_scale")
@@ -713,6 +741,7 @@ def create_yield_prediction(
         db=db,
         crop_name=values["crop"],
         predicted_yield=predicted_yield,
+        state_name=values["state"],
     )
 
     model_bundle = get_yield_model()
