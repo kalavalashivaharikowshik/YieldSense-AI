@@ -749,6 +749,7 @@ YieldSense-AI/
 │
 ├── .github/
 │   └── workflows/
+│       ├── ci.yml
 │       ├── main_yieldsense-api.yml
 │       └── azure-static-web-apps-*.yml
 │
@@ -776,10 +777,12 @@ YieldSense-AI/
 │   │   ├── core/
 │   │   │   ├── config.py
 │   │   │   ├── logging_config.py
-│   │   │   └── security.py
+│   │   │   ├── security.py
+│   │   │   └── time.py
 │   │   │
 │   │   ├── db/
-│   │   │   └── database.py
+│   │   │   ├── database.py
+│   │   │   └── migrations.py      # runs Alembic at startup
 │   │   │
 │   │   ├── middleware/
 │   │   │   └── request_logging.py
@@ -807,12 +810,15 @@ YieldSense-AI/
 │   │   │
 │   │   └── model_loader.py
 │   │
-│   ├── tests/
-│   ├── logs/
+│   ├── scripts/
+│   │   ├── create_admin.py
+│   │   └── load_reference_data.py
+│   │
+│   ├── tests/                     # pytest suite
 │   ├── alembic.ini
 │   ├── pyproject.toml
 │   ├── requirements.txt
-│   ├── .env
+│   ├── requirements-dev.txt
 │   └── .env.example
 │
 ├── web/
@@ -822,17 +828,18 @@ YieldSense-AI/
 │   │
 │   ├── src/
 │   │   ├── api/
-│   │   ├── assets/
 │   │   ├── components/
 │   │   ├── context/
 │   │   ├── hooks/
 │   │   ├── layouts/
 │   │   ├── pages/
 │   │   ├── routes/
+│   │   ├── services/
+│   │   ├── utils/
 │   │   ├── App.jsx
 │   │   └── main.jsx
 │   │
-│   ├── .env
+│   ├── .env.example
 │   ├── package.json
 │   ├── vite.config.js
 │   └── index.html
@@ -841,18 +848,18 @@ YieldSense-AI/
 │   │
 │   ├── app/
 │   ├── assets/
-│   ├── components/
-│   ├── constants/
-│   ├── hooks/
 │   ├── src/
 │   │   ├── api/
 │   │   ├── components/
 │   │   ├── constants/
 │   │   ├── context/
 │   │   ├── hooks/
-│   │   └── services/
+│   │   ├── services/
+│   │   ├── storage/
+│   │   ├── styles/
+│   │   └── utils/
 │   │
-│   ├── .env
+│   ├── .env.example
 │   ├── app.json
 │   ├── eas.json
 │   └── package.json
