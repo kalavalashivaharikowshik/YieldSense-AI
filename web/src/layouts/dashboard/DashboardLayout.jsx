@@ -40,6 +40,12 @@ const navigationItems = [
     farmerOnly: true,
   },
   {
+    label: "Prediction History",
+    path: "/predictions/history",
+    icon: History,
+    farmerOnly: true,
+  },
+  {
     label: "Crop Recommendation",
     path: "/recommendation",
     icon: Sprout,
@@ -52,14 +58,14 @@ const navigationItems = [
     farmerOnly: true,
   },
   {
-      label: "Weather Analysis",
-      icon: CloudRain,
-      path: "/weather-analysis",
+    label: "Weather Analysis",
+    icon: CloudRain,
+    path: "/weather-analysis",
   },
   {
-      label: "Soil Analysis",
-      icon: FlaskConical,
-      path: "/soil-analysis",
+    label: "Soil Analysis",
+    icon: FlaskConical,
+    path: "/soil-analysis",
   },
   {
     label: "Analytics Dashboard",
