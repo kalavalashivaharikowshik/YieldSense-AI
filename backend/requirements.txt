@@ -34,7 +34,6 @@ python-jose==3.5.0
 python-multipart==0.0.32
 reportlab==5.0.0
 rsa==4.9.1
-ruff==0.16.3
 scikit-learn==1.9.0
 scipy==1.17.1
 six==1.17.0
