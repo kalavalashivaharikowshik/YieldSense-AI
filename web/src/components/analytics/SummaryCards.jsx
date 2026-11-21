@@ -47,7 +47,7 @@ function SummaryCards({ summary }) {
       value: `${formatNumber(
         summary?.average_predicted_yield
       )} t/ha`,
-      description: "Average predicted yield",
+      description: "Average of crops measured in tonnes",
       icon: Sprout,
       iconClass: "bg-emerald-100 text-emerald-600",
       decorationClass: "bg-emerald-100",

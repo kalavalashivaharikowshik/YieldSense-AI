@@ -7,6 +7,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { useAuth } from "../../hooks/useAuth";
+import { shortProductionUnit, shortYieldUnit } from "../../utils/units";
 
 
 function formatNumber(value, decimals = 2) {
@@ -116,7 +117,7 @@ function RecentPredictions({
                         {formatNumber(
                           prediction.predicted_yield
                         )}{" "}
-                        t/ha
+                        {shortYieldUnit(prediction.yield_unit)}
                       </strong>
                     </span>
 
@@ -126,7 +127,7 @@ function RecentPredictions({
                         {formatNumber(
                           prediction.estimated_production
                         )}{" "}
-                        t
+                        {shortProductionUnit(prediction.production_unit)}
                       </strong>
                     </span>
                   </div>

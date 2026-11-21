@@ -59,7 +59,7 @@ function SeasonAnalyticsChart({ seasons = [] }) {
             </h2>
 
             <p className="mt-1 text-sm text-slate-500">
-              Prediction distribution across farming seasons.
+              Prediction distribution across farming seasons. Average yield includes crops measured in tonnes only.
             </p>
           </div>
         </div>

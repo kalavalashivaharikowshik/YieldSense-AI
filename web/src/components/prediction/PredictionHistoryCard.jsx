@@ -7,6 +7,7 @@ import {
   Sprout,
   Tractor,
 } from "lucide-react";
+import { shortProductionUnit, shortYieldUnit } from "../../utils/units";
 
 function PredictionHistoryCard({ prediction }) {
   const createdAt = prediction.created_at
@@ -66,7 +67,7 @@ function PredictionHistoryCard({ prediction }) {
           label="Predicted Yield"
           value={`${formatNumber(
             prediction.predicted_yield
-          )} t/ha`}
+          )} ${shortYieldUnit(prediction.prediction_unit)}`}
           tone="green"
         />
 
@@ -75,7 +76,7 @@ function PredictionHistoryCard({ prediction }) {
           label="Estimated Production"
           value={`${formatNumber(
             prediction.estimated_production
-          )} t`}
+          )} ${shortProductionUnit(prediction.production_unit)}`}
           tone="amber"
         />
       </div>

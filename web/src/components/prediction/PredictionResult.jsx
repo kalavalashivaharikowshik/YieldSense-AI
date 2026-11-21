@@ -9,6 +9,10 @@ import {
   Sprout,
   Tractor,
 } from "lucide-react";
+import {
+  isTonnesUnit,
+  shortYieldUnit,
+} from "../../utils/units";
 
 function PredictionResult({
   prediction,
@@ -24,8 +28,13 @@ function PredictionResult({
       ).toLocaleString()
     : "Recently";
 
-  const estimatedKilograms =
-    Number(prediction.estimated_production) * 1000;
+  // Kilograms only make sense for crops measured in tonnes; coconut is
+  // counted in nuts and cotton, jute and mesta in bales.
+  const productionNote = isTonnesUnit(prediction.production_unit)
+    ? `Approximately ${formatWholeNumber(
+        Number(prediction.estimated_production) * 1000
+      )} kg`
+    : "Estimated total";
 
   const categoryStyle = getCategoryStyle(
     prediction.yield_category
@@ -97,8 +106,8 @@ function PredictionResult({
             label="Predicted Yield"
             value={`${formatNumber(
               prediction.predicted_yield
-            )} t/ha`}
-            note="Metric tons per hectare"
+            )} ${shortYieldUnit(prediction.prediction_unit)}`}
+            note={prediction.prediction_unit || "metric tons per hectare"}
             className="border-green-200 bg-green-50 text-green-900"
           />
 
@@ -107,10 +116,8 @@ function PredictionResult({
             label="Estimated Production"
             value={`${formatNumber(
               prediction.estimated_production
-            )} metric tons`}
-            note={`Approximately ${formatWholeNumber(
-              estimatedKilograms
-            )} kg for a farm area of ${formatNumber(
+            )} ${prediction.production_unit || "metric tons"}`}
+            note={`${productionNote} for a farm area of ${formatNumber(
               prediction.area_hectares
             )} hectares`}
             className="border-amber-200 bg-amber-50 text-amber-900"

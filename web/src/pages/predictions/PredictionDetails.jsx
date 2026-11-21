@@ -32,6 +32,10 @@ import DashboardLayout from "../../layouts/dashboard/DashboardLayout";
 import { predictionService } from "../../services/predictionService";
 import { getApiErrorMessage } from "../../utils/apiError";
 import { useAuth } from "../../hooks/useAuth";
+import {
+  isTonnesUnit,
+  shortYieldUnit,
+} from "../../utils/units";
 
 function PredictionDetails() {
   const { isFarmer } = useAuth();
@@ -137,8 +141,13 @@ function PredictionDetails() {
     prediction.yield_category
   );
 
-  const estimatedKilograms =
-    Number(prediction.estimated_production) * 1000;
+  // Kilograms only make sense for crops measured in tonnes; coconut is
+  // counted in nuts and cotton, jute and mesta in bales.
+  const productionNote = isTonnesUnit(prediction.production_unit)
+    ? `Approximately ${formatWholeNumber(
+        Number(prediction.estimated_production) * 1000
+      )} kg`
+    : "Estimated total";
 
   return (
     <DashboardLayout>
@@ -217,8 +226,8 @@ function PredictionDetails() {
                 label="Predicted Yield"
                 value={`${formatNumber(
                   prediction.predicted_yield
-                )} t/ha`}
-                note="Metric tons per hectare"
+                )} ${shortYieldUnit(prediction.prediction_unit)}`}
+                note={prediction.prediction_unit || "metric tons per hectare"}
                 tone="green"
               />
 
@@ -227,10 +236,8 @@ function PredictionDetails() {
                 label="Estimated Production"
                 value={`${formatNumber(
                   prediction.estimated_production
-                )} metric tons`}
-                note={`Approximately ${formatWholeNumber(
-                  estimatedKilograms
-                )} kg for ${formatNumber(
+                )} ${prediction.production_unit || "metric tons"}`}
+                note={`${productionNote} for ${formatNumber(
                   prediction.area_hectares
                 )} hectares`}
                 tone="amber"

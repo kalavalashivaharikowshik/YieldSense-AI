@@ -114,7 +114,7 @@ function RecommendationAlternatives({
                 </p>
 
                 <p className="mt-1 text-xs text-gray-500">
-                  {yieldUnit}
+                  {alternative.yield_unit ?? yieldUnit}
                 </p>
               </div>
 
@@ -131,7 +131,7 @@ function RecommendationAlternatives({
                 </p>
 
                 <p className="mt-1 text-xs text-gray-500">
-                  {productionUnit}
+                  {alternative.production_unit ?? productionUnit}
                 </p>
               </div>
             </div>
@@ -157,6 +157,14 @@ function RecommendationAlternatives({
                 <p className="mt-1 font-semibold text-gray-900">
                   {alternative.historical_record_count ?? 0}
                 </p>
+
+                {alternative.historical_percentile != null && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    Prediction beats{" "}
+                    {Math.round(alternative.historical_percentile)}% of
+                    past seasons
+                  </p>
+                )}
               </div>
             </div>
           </article>

@@ -10,6 +10,8 @@ import {
 } from "recharts";
 import { Sprout } from "lucide-react";
 
+import { isTonnesUnit, shortYieldUnit } from "../../utils/units";
+
 
 function formatYield(value) {
   const number = Number(value);
@@ -29,8 +31,16 @@ function CropAnalyticsChart({ crops = [] }) {
   const chartData = crops.map((item) => ({
     crop: item.crop || "Unknown",
     predictions: Number(item.prediction_count || 0),
-    averageYield: Number(item.average_yield || 0),
+    // Crops in other units (e.g. coconut in nuts/ha) would dwarf every
+    // other bar, so they are listed below the chart instead.
+    averageYield: isTonnesUnit(item.yield_unit)
+      ? Number(item.average_yield || 0)
+      : null,
   }));
+
+  const otherUnitCrops = crops.filter(
+    (item) => !isTonnesUnit(item.yield_unit)
+  );
 
   return (
     <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -128,7 +138,9 @@ function CropAnalyticsChart({ crops = [] }) {
                 formatter={(value, name) => {
                   if (name === "Average Yield") {
                     return [
-                      `${formatYield(value)} t/ha`,
+                      value == null
+                        ? "Shown below the chart"
+                        : `${formatYield(value)} t/ha`,
                       name,
                     ];
                   }
@@ -173,6 +185,21 @@ function CropAnalyticsChart({ crops = [] }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
+      )}
+
+      {otherUnitCrops.length > 0 && (
+        <p className="mt-4 text-xs leading-5 text-slate-500">
+          Measured in other units:{" "}
+          {otherUnitCrops
+            .map(
+              (item) =>
+                `${item.crop} ${formatYield(item.average_yield)} ${shortYieldUnit(
+                  item.yield_unit
+                )}`
+            )
+            .join(", ")}
+          .
+        </p>
       )}
     </section>
   );

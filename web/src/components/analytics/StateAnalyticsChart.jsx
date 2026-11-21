@@ -46,7 +46,8 @@ function StateAnalyticsChart({ states = [] }) {
 
             <p className="mt-1 text-sm text-slate-500">
               Compare prediction activity and yield across
-              states.
+              states. Average yield includes crops measured in
+              tonnes only.
             </p>
           </div>
         </div>

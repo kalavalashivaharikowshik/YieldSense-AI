@@ -347,7 +347,7 @@ function PredictionHistory() {
           value={`${formatNumber(
             summary?.average_predicted_yield
           )} t/ha`}
-          note="Metric tons per hectare"
+          note="Crops measured in tonnes"
           icon={Sprout}
           tone="emerald"
         />
@@ -367,7 +367,7 @@ function PredictionHistory() {
           value={`${formatNumber(
             summary?.total_estimated_production
           )} t`}
-          note="Estimated metric tons"
+          note="Tonnes, for crops measured in tonnes"
           icon={Package}
           tone="amber"
         />
