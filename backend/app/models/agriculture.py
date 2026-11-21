@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from sqlalchemy import (
     Column,
@@ -9,6 +8,7 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 
+from app.core.time import utc_now_naive
 from app.db.database import Base
 
 
@@ -41,7 +41,7 @@ class HistoricalCropYield(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now_naive,
         nullable=False,
     )
 
@@ -83,14 +83,14 @@ class StateSoilReference(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now_naive,
         nullable=False,
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
         nullable=False,
     )
 
@@ -117,7 +117,7 @@ class StateWeatherReference(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now_naive,
         nullable=False,
     )
 

@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from sqlalchemy import (
     Boolean,
@@ -11,6 +10,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from app.core.time import utc_now_naive
 from app.db.database import Base
 
 
@@ -45,14 +45,14 @@ class Farm(Base):
 
     created_at = Column(
         DateTime,
-        default=datetime.utcnow,
+        default=utc_now_naive,
         nullable=False,
     )
 
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=utc_now_naive,
+        onupdate=utc_now_naive,
         nullable=False,
     )
 

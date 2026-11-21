@@ -2,13 +2,14 @@
 
 import logging
 import math
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.time import utc_now_naive
 from app.models.user import User
 
 logger = logging.getLogger("yieldsense.auth")
@@ -20,9 +21,7 @@ INVALID_CREDENTIALS_MESSAGE = "Invalid email or password"
 _DUMMY_PASSWORD_HASH = hash_password("dummy-password-for-timing")
 
 
-def utc_now() -> datetime:
-    """Naive UTC timestamp, matching how user timestamps are stored."""
-    return datetime.now(UTC).replace(tzinfo=None)
+utc_now = utc_now_naive
 
 
 def ensure_not_locked(user: User) -> None:
