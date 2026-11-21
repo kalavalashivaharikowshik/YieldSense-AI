@@ -41,6 +41,48 @@ def calculate_percentage_change(
     return round_value(change)
 
 
+def _trend_line(
+    years: list[int],
+    values: list[float],
+) -> tuple[float, float]:
+    """Least-squares slope and intercept of values over years."""
+    count = len(years)
+
+    if count < 2:
+        return 0.0, float(values[0]) if values else 0.0
+
+    mean_year = sum(years) / count
+    mean_value = sum(values) / count
+    spread = sum((year - mean_year) ** 2 for year in years)
+
+    if spread == 0:
+        return 0.0, mean_value
+
+    slope = (
+        sum(
+            (year - mean_year) * (value - mean_value)
+            for year, value in zip(years, values, strict=True)
+        )
+        / spread
+    )
+
+    return slope, mean_value - slope * mean_year
+
+
+def trend_change(years: list[int], values: list[float]) -> float:
+    """Change over the period according to the trend line."""
+    slope, _ = _trend_line(years, values)
+
+    return slope * (years[-1] - years[0]) if years else 0.0
+
+
+def trend_start_value(years: list[int], values: list[float]) -> float:
+    """Trend-line value in the first year of the period."""
+    slope, intercept = _trend_line(years, values)
+
+    return slope * years[0] + intercept if years else 0.0
+
+
 def get_direction(
     change: float,
     stable_threshold: float,
@@ -402,26 +444,30 @@ def analyze_weather(
     first_record = records[0]
     last_record = records[-1]
 
+    years = [record.year for record in records]
+
+    # Changes come from a least-squares trend line over every year, not
+    # from comparing only the first and last year: a single unusually
+    # wet or hot year at either end used to flip the reported trend.
     temperature_change = round_value(
-        last_record.avg_temp_c
-        - first_record.avg_temp_c
+        trend_change(years, temperature_values)
     )
 
     rainfall_change = round_value(
-        last_record.total_rainfall_mm
-        - first_record.total_rainfall_mm
+        trend_change(years, rainfall_values)
     )
+
+    rainfall_start = trend_start_value(years, rainfall_values)
 
     rainfall_change_percent = (
         calculate_percentage_change(
-            first_record.total_rainfall_mm,
-            last_record.total_rainfall_mm,
+            rainfall_start,
+            rainfall_start + rainfall_change,
         )
     )
 
     humidity_change = round_value(
-        last_record.avg_humidity_percent
-        - first_record.avg_humidity_percent
+        trend_change(years, humidity_values)
     )
 
     trend = WeatherTrend(
