@@ -479,6 +479,39 @@ The prediction system provides:
 
 Prediction results are stored in PostgreSQL for future analysis and reporting.
 
+## How farm inputs reach the model
+
+The model was trained on **state-level** crop statistics. In that data,
+`Area` is the total area of one crop in a whole state and season (median
+about 9,300 ha), and `Fertilizer` / `Pesticide` are totals for that area.
+A single farm is usually a few hectares, so its own numbers would sit far
+outside anything the model has seen.
+
+Yield is measured per hectare and does not depend on how large the area
+is, so the API works like this (`backend/app/services/model_scale.py`):
+
+1. Fertilizer and pesticide are entered in **kg per hectare** (0–2,000 and
+   0–100). Both are optional; when left empty, the typical historical rate
+   for the state, crop and season is used.
+2. The model receives the **typical area** for the same state, crop and
+   season from the training data, with the farmer's per-hectare rates
+   applied to it.
+3. The farm's real area is used only to turn the predicted yield into
+   **estimated production**.
+
+## Yield units
+
+The source statistics record production in tonnes for most crops, but count
+**coconut in nuts** and **cotton, jute and mesta in bales**. Each prediction
+stores the unit of its crop (`prediction_unit`, `production_unit`), and
+cross-crop averages in analytics only include tonne-measured crops.
+
+## Yield category
+
+The Low / Average / Good / Excellent label compares the prediction with the
+historical yield quartiles of the same crop **in the same state** when the
+state has at least 8 records, otherwise across all states.
+
 ---
 
 # 🌦️ Weather Analysis
@@ -523,6 +556,24 @@ The crop recommendation module provides:
 - Recommendation Explanation
 - Recommendation History
 - Recommendation Details
+
+## How crops are ranked
+
+Raw yields of different crops cannot be compared: coconut is counted in
+nuts per hectare (around 8,000), sugarcane is about 50 t/ha and pulses about
+1 t/ha. Every crop with at least 3 recorded seasons in the farm's state and
+season is predicted with the yield model, and then scored against **its own
+history** there:
+
+| Weight | Component | Meaning |
+|---:|---|---|
+| 60% | Expected performance | Where the predicted yield falls among the crop's past yields (percentile) |
+| 25% | Reliability | How steady the crop's yield has been (1 − coefficient of variation) |
+| 15% | Local experience | How many seasons of records exist (full score at 15) |
+
+Soil values are state averages, so they are the same for every farm in a
+state. Recommendations support, but do not replace, local agricultural
+advice.
 
 ---
 
