@@ -81,7 +81,7 @@ function AppRoutes() {
       <Route
         path="/predictions/:predictionId"
         element={
-          <ProtectedRoute farmerOnly>
+          <ProtectedRoute>
             <PredictionDetails />
           </ProtectedRoute>
         }
@@ -108,7 +108,7 @@ function AppRoutes() {
       <Route
         path="/recommendations/:recommendationId"
         element={
-          <ProtectedRoute farmerOnly>
+          <ProtectedRoute>
             <RecommendationDetails />
           </ProtectedRoute>
         }

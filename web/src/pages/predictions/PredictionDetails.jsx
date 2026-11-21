@@ -31,8 +31,12 @@ import DashboardLayout from "../../layouts/dashboard/DashboardLayout";
 
 import { predictionService } from "../../services/predictionService";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { useAuth } from "../../hooks/useAuth";
 
 function PredictionDetails() {
+  const { isFarmer } = useAuth();
+  // Admins can open any prediction, but the history page is farmer-only.
+  const historyPath = isFarmer ? "/predictions/history" : "/analytics";
   const { predictionId } = useParams();
   const navigate = useNavigate();
 
@@ -51,7 +55,7 @@ function PredictionDetails() {
     ) {
       toast.error("Invalid prediction ID.");
 
-      navigate("/predictions/history", {
+      navigate(historyPath, {
         replace: true,
       });
 
@@ -77,7 +81,7 @@ function PredictionDetails() {
     } finally {
       setLoading(false);
     }
-  }, [predictionId, navigate]);
+  }, [predictionId, navigate, historyPath]);
 
   useEffect(() => {
     loadPrediction();
@@ -112,11 +116,11 @@ function PredictionDetails() {
           </p>
 
           <Link
-            to="/predictions/history"
+            to={historyPath}
             className="mt-6 inline-flex items-center gap-2 rounded-xl bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800"
           >
             <History size={18} />
-            Return to History
+            {isFarmer ? "Return to History" : "Return to Analytics"}
           </Link>
         </div>
       </DashboardLayout>
@@ -141,11 +145,11 @@ function PredictionDetails() {
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link
-            to="/predictions/history"
+            to={historyPath}
             className="inline-flex items-center gap-2 text-sm font-semibold text-green-700 hover:text-green-800"
           >
             <ArrowLeft size={17} />
-            Back to Prediction History
+            {isFarmer ? "Back to Prediction History" : "Back to Analytics"}
           </Link>
 
           <h1 className="mt-3 text-3xl font-bold text-gray-900">
@@ -158,13 +162,15 @@ function PredictionDetails() {
           </p>
         </div>
 
-        <Link
-          to="/prediction"
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800"
-        >
-          <Plus size={19} />
-          New Prediction
-        </Link>
+        {isFarmer && (
+          <Link
+            to="/prediction"
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-green-700 px-5 py-3 font-semibold text-white hover:bg-green-800"
+          >
+            <Plus size={19} />
+            New Prediction
+          </Link>
+        )}
       </div>
 
       <section className="mt-7 overflow-hidden rounded-3xl border border-green-200 bg-white shadow-sm">

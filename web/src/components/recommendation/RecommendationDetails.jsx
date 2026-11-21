@@ -12,8 +12,13 @@ import RecommendationResult from "../../components/recommendation/Recommendation
 
 import { getRecommendation } from "../../services/recommendationService";
 import { getApiErrorMessage } from "../../utils/apiError";
+import { useAuth } from "../../hooks/useAuth";
 
 function RecommendationDetails() {
+  const { isFarmer } = useAuth();
+  const historyPath = isFarmer
+    ? "/recommendations/history"
+    : "/analytics";
   const { recommendationId } = useParams();
 
   const [recommendation, setRecommendation] =
@@ -70,7 +75,7 @@ function RecommendationDetails() {
               </div>
 
               <Link
-                to="/recommendations/history"
+                to={historyPath}
                 className="inline-flex items-center justify-center gap-2 rounded-xl border border-green-700 bg-white px-5 py-3 text-sm font-semibold text-green-700 transition hover:bg-green-50"
               >
                 <ArrowLeft size={18} />
@@ -111,7 +116,7 @@ function RecommendationDetails() {
             </p>
 
             <Link
-              to="/recommendations/history"
+              to={historyPath}
               className="mt-6 inline-flex items-center justify-center rounded-xl bg-green-700 px-5 py-3 text-sm font-bold text-white hover:bg-green-800"
             >
               Return to History
