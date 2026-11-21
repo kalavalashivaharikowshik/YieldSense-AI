@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import fcntl
 import json
 import logging
 import os
@@ -12,6 +11,11 @@ from pathlib import Path
 from typing import Any
 
 import joblib
+
+try:  # Linux/macOS (Azure App Service runs Linux)
+    import fcntl
+except ImportError:  # Windows development machines
+    fcntl = None
 from azure.storage.blob import BlobServiceClient
 from sklearn.pipeline import Pipeline
 
@@ -129,7 +133,10 @@ def _download_model_from_azure() -> None:
 
     with lock_path.open("w") as lock_file:
         # Only one process downloads; the others wait and then reuse it.
-        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        # On Windows (local development) there is a single process, so
+        # the in-process lock in get_yield_model is enough.
+        if fcntl is not None:
+            fcntl.flock(lock_file, fcntl.LOCK_EX)
 
         try:
             if MODEL_ARTIFACT_PATH.exists():
@@ -137,7 +144,8 @@ def _download_model_from_azure() -> None:
 
             _download_to_final_path(connection_string)
         finally:
-            fcntl.flock(lock_file, fcntl.LOCK_UN)
+            if fcntl is not None:
+                fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 def _download_to_final_path(connection_string: str) -> None:
