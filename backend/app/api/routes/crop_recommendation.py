@@ -5,7 +5,7 @@ from fastapi import (
 )
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, require_role
 from app.db.database import get_db
 from app.models.user import User
 from app.schemas.crop_recommendation import (
@@ -33,9 +33,10 @@ router = APIRouter(
 def recommend_crop(
     request: CropRecommendationRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(
-        get_current_user,
-    ),
+    # Same rule as predictions: farmers create recommendations for their
+    # own farms; admins can view them but not create them on a farmer's
+    # behalf (the result would be saved under the admin's account).
+    current_user: User = Depends(require_role("farmer")),
 ):
     recommendation = create_crop_recommendation(
         db=db,

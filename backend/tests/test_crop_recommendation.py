@@ -81,3 +81,13 @@ def test_recommendation_with_too_little_history(client, farmer_headers):
 
     assert response.status_code == 422
     assert "not enough historical records" in response.json()["detail"]
+
+
+def test_admin_cannot_create_recommendations(client, admin_headers):
+    response = client.post(
+        "/api/crop-recommendation",
+        json={"farm_id": 1, "season": "Rabi", "crop_year": 2020},
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 403
