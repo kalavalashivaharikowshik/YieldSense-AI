@@ -10,6 +10,7 @@ class AnalyticsSummary(BaseModel):
 
 class CropAnalyticsItem(BaseModel):
     crop: str
+    yield_unit: str = "metric tons per hectare"
     prediction_count: int
     average_yield: float
 
@@ -34,6 +35,8 @@ class RecentPredictionItem(BaseModel):
     crop_year: int
     predicted_yield: float
     estimated_production: float
+    yield_unit: str = "metric tons per hectare"
+    production_unit: str = "metric tons"
 
 
 class AnalyticsDashboardResponse(BaseModel):

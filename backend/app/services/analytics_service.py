@@ -1,10 +1,11 @@
 from fastapi import HTTPException, status
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Query, Session
 
 from app.models.farm import Farm
 from app.models.prediction import YieldPrediction
 from app.models.user import User
+from app.services.crop_units import get_crop_unit, tonnes_crop_condition
 
 
 def get_user_role(current_user: User) -> str:
@@ -74,6 +75,19 @@ def safe_float(value) -> float:
     return round(float(value), 2)
 
 
+def tonnes_only(column):
+    """Average only crops measured in tonnes.
+
+    Coconut (nuts) and cotton, jute and mesta (bales) use other units, so
+    mixing them into one average produced a meaningless number. Counts
+    still include every prediction.
+    """
+    return case(
+        (tonnes_crop_condition(YieldPrediction.crop), column),
+        else_=None,
+    )
+
+
 def get_analytics_summary(
     db: Session,
     current_user: User,
@@ -90,12 +104,12 @@ def get_analytics_summary(
     average_values_query = (
         db.query(
             func.avg(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ).label(
                 "average_predicted_yield"
             ),
             func.avg(
-                YieldPrediction.estimated_production
+                tonnes_only(YieldPrediction.estimated_production)
             ).label(
                 "average_estimated_production"
             ),
@@ -185,6 +199,7 @@ def get_crop_analytics(
             "average_yield": safe_float(
                 row.average_yield
             ),
+            "yield_unit": get_crop_unit(row.crop).yield_unit,
         }
         for row in rows
     ]
@@ -203,7 +218,7 @@ def get_season_analytics(
                 YieldPrediction.id
             ).label("prediction_count"),
             func.avg(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ).label("average_yield"),
         )
     )
@@ -218,8 +233,8 @@ def get_season_analytics(
         .group_by(YieldPrediction.season)
         .order_by(
             func.avg(
-                YieldPrediction.predicted_yield
-            ).desc(),
+                tonnes_only(YieldPrediction.predicted_yield)
+            ).desc().nulls_last(),
             YieldPrediction.season.asc(),
         )
         .all()
@@ -251,7 +266,7 @@ def get_state_analytics(
                 YieldPrediction.id
             ).label("prediction_count"),
             func.avg(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ).label("average_yield"),
         )
     )
@@ -266,8 +281,8 @@ def get_state_analytics(
         .group_by(YieldPrediction.state)
         .order_by(
             func.avg(
-                YieldPrediction.predicted_yield
-            ).desc(),
+                tonnes_only(YieldPrediction.predicted_yield)
+            ).desc().nulls_last(),
             YieldPrediction.state.asc(),
         )
         .limit(limit)
@@ -327,6 +342,10 @@ def get_recent_predictions(
             "estimated_production": safe_float(
                 prediction.estimated_production
             ),
+            "yield_unit": get_crop_unit(prediction.crop).yield_unit,
+            "production_unit": get_crop_unit(
+                prediction.crop
+            ).production_unit,
         }
         for prediction in predictions
     ]

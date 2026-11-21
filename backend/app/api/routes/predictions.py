@@ -26,6 +26,7 @@ from app.schemas.prediction import (
     YieldPredictionResponse,
     YieldPredictionSummaryResponse,
 )
+from app.services.analytics_service import tonnes_only
 from app.services.prediction_service import (
     create_yield_prediction,
 )
@@ -198,25 +199,25 @@ def get_prediction_summary(
         ),
         func.coalesce(
             func.avg(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ),
             0,
         ),
         func.coalesce(
             func.max(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ),
             0,
         ),
         func.coalesce(
             func.min(
-                YieldPrediction.predicted_yield
+                tonnes_only(YieldPrediction.predicted_yield)
             ),
             0,
         ),
         func.coalesce(
             func.sum(
-                YieldPrediction.estimated_production
+                tonnes_only(YieldPrediction.estimated_production)
             ),
             0,
         ),

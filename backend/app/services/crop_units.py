@@ -50,3 +50,19 @@ def get_crop_unit(crop: str) -> CropUnit:
 
 def is_tonnes_crop(crop: str) -> bool:
     return get_crop_unit(crop).is_tonnes
+
+
+def tonnes_crop_condition(crop_column):
+    """SQL condition that is true for crops measured in tonnes.
+
+    Matching on the crop name (not the stored unit) also covers older
+    predictions that were saved with 'metric tons per hectare' for every
+    crop.
+    """
+    from sqlalchemy import func
+
+    normalized = func.lower(func.replace(crop_column, " ", ""))
+
+    return normalized.notin_(
+        ["".join(name.split()) for name in _SPECIAL_UNITS]
+    )
