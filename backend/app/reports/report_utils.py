@@ -3,6 +3,7 @@ from collections.abc import Iterable, Sequence
 from datetime import UTC, datetime
 from io import BytesIO, StringIO
 from typing import Any
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -51,6 +52,15 @@ def normalize_value(value: Any) -> str:
         return f"{value:.4f}"
 
     return str(value)
+
+
+def pdf_text(value: Any) -> str:
+    """Escape text for a ReportLab Paragraph.
+
+    Paragraph parses its input as markup, so a farm name such as
+    "<b>Farm" used to crash the whole export with a parser error.
+    """
+    return escape(normalize_value(value))
 
 
 def create_csv_buffer(
@@ -137,12 +147,12 @@ def create_pdf_buffer(
 
     story = [
         Paragraph("YieldSense AI", title_style),
-        Paragraph(title, styles["Heading1"]),
+        Paragraph(pdf_text(title), styles["Heading1"]),
     ]
 
     if subtitle:
         story.append(
-            Paragraph(subtitle, subtitle_style)
+            Paragraph(pdf_text(subtitle), subtitle_style)
         )
 
     generated_at = utc_now().strftime(
@@ -151,7 +161,7 @@ def create_pdf_buffer(
 
     story.append(
         Paragraph(
-            f"Generated on: {generated_at}",
+            f"Generated on: {pdf_text(generated_at)}",
             subtitle_style,
         )
     )
@@ -178,11 +188,11 @@ def create_pdf_buffer(
             summary_data.append(
                 [
                     Paragraph(
-                        normalize_value(label),
+                        pdf_text(label),
                         small_style,
                     ),
                     Paragraph(
-                        normalize_value(value),
+                        pdf_text(value),
                         small_style,
                     ),
                 ]
@@ -264,7 +274,7 @@ def create_pdf_buffer(
     table_data = [
         [
             Paragraph(
-                f"<b>{normalize_value(header)}</b>",
+                f"<b>{pdf_text(header)}</b>",
                 small_style,
             )
             for header in headers
@@ -275,7 +285,7 @@ def create_pdf_buffer(
         table_data.append(
             [
                 Paragraph(
-                    normalize_value(value),
+                    pdf_text(value),
                     small_style,
                 )
                 for value in row
