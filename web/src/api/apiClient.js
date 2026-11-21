@@ -1,6 +1,18 @@
 import axios from "axios";
 
-import { getToken } from "../utils/token";
+import {
+  SESSION_EXPIRED_EVENT,
+  getToken,
+  removeToken,
+} from "../utils/token";
+
+// A 401 from these endpoints means wrong credentials, not an expired
+// session, so it must not log the user out.
+const CREDENTIAL_ENDPOINTS = [
+  "/auth/login",
+  "/auth/token",
+  "/auth/change-password",
+];
 
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -33,7 +45,23 @@ apiClient.interceptors.request.use(
 
 apiClient.interceptors.response.use(
   (response) => response,
-  (error) => Promise.reject(error)
+  (error) => {
+    const requestUrl = error.config?.url ?? "";
+    const isCredentialCheck = CREDENTIAL_ENDPOINTS.some((endpoint) =>
+      requestUrl.endsWith(endpoint)
+    );
+
+    if (
+      error.response?.status === 401 &&
+      !isCredentialCheck &&
+      getToken()
+    ) {
+      removeToken();
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 export default apiClient;

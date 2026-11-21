@@ -11,6 +11,8 @@ function ProtectedRoute({
 
   const {
     initializing,
+    connectionError,
+    retryConnection,
     isAuthenticated,
     isAdmin,
     isFarmer,
@@ -23,6 +25,29 @@ function ProtectedRoute({
           <p className="font-semibold text-gray-700">
             Loading account...
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated && connectionError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md rounded-2xl border border-gray-200 bg-white px-8 py-6 text-center shadow-sm">
+          <p className="font-semibold text-gray-800">
+            Unable to reach the YieldSense AI server
+          </p>
+          <p className="mt-2 text-sm text-gray-600">
+            Check your internet connection. The server may also be
+            starting up, which can take a moment.
+          </p>
+          <button
+            type="button"
+            onClick={retryConnection}
+            className="mt-4 rounded-xl bg-green-700 px-5 py-2 text-sm font-semibold text-white hover:bg-green-800"
+          >
+            Try again
+          </button>
         </div>
       </div>
     );

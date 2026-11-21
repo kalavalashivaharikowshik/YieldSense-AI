@@ -8,16 +8,18 @@ import {
 import authApi from "../api/authApi";
 import { AuthContext } from "./auth-context";
 import {
+  SESSION_EXPIRED_EVENT,
   getToken,
   removeToken,
   saveToken,
 } from "../utils/token";
 
-
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [initializing, setInitializing] = useState(true);
+  // True when a saved session could not be checked because the server
+  // was unreachable (offline, timeout, cold start).
+  const [connectionError, setConnectionError] = useState(false);
 
   const loadCurrentUser = useCallback(async () => {
     const token = getToken();
@@ -31,14 +33,39 @@ export function AuthProvider({ children }) {
       const response = await authApi.get("/me");
 
       setUser(response.data);
+      setConnectionError(false);
 
       return response.data;
     } catch (error) {
-      removeToken();
-      setUser(null);
+      setConnectionError(error.response?.status !== 401);
+
+      // Only a rejected token ends the session. A timeout, an offline
+      // device or a server cold start must not log the user out.
+      if (error.response?.status === 401) {
+        removeToken();
+        setUser(null);
+      }
 
       throw error;
     }
+  }, []);
+
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      setUser(null);
+    };
+
+    window.addEventListener(
+      SESSION_EXPIRED_EVENT,
+      handleSessionExpired
+    );
+
+    return () => {
+      window.removeEventListener(
+        SESSION_EXPIRED_EVENT,
+        handleSessionExpired
+      );
+    };
   }, []);
 
   useEffect(() => {
@@ -46,7 +73,8 @@ export function AuthProvider({ children }) {
       try {
         await loadCurrentUser();
       } catch {
-        // Invalid or expired token was already removed.
+        // A rejected token was already removed. For network errors the
+        // token is kept and the user can retry once back online.
       } finally {
         setInitializing(false);
       }
@@ -90,6 +118,18 @@ export function AuthProvider({ children }) {
     return loadCurrentUser();
   }, [loadCurrentUser]);
 
+  const retryConnection = useCallback(async () => {
+    setInitializing(true);
+
+    try {
+      await loadCurrentUser();
+    } catch {
+      // connectionError is updated by loadCurrentUser.
+    } finally {
+      setInitializing(false);
+    }
+  }, [loadCurrentUser]);
+
   const updateUser = useCallback((updatedUser) => {
     setUser(updatedUser);
   }, []);
@@ -98,6 +138,8 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       initializing,
+      connectionError,
+      retryConnection,
       isAuthenticated: Boolean(user),
       isAdmin: user?.role === "admin",
       isFarmer: user?.role === "farmer",
@@ -109,6 +151,8 @@ export function AuthProvider({ children }) {
     [
       user,
       initializing,
+      connectionError,
+      retryConnection,
       login,
       logout,
       refreshUser,
