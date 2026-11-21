@@ -316,6 +316,24 @@ Key model evaluation results obtained during development included:
 
 The **Random Forest Regressor** provided the strongest overall performance and was selected as the production prediction model.
 
+### Reading these numbers carefully
+
+The table above comes from a **random** train/test split, where records of
+the same state and crop from neighbouring years end up in both sets. A
+fairer test is the **time-based** split (`ml/scripts/time_based_validation.py`):
+train on 1997–2018, test on 2019–2020.
+
+| Random Forest, time-based test (2019–2020) | MAE | R² |
+|---|---:|---:|
+| All crops | ~11.6 | ~0.95 |
+| All crops except coconut | ~1.00 t/ha | ~0.93 |
+
+Coconut yields are counted in nuts (thousands per hectare), so its 9 test
+rows out of 1,116 account for about **91% of the total absolute error** and
+dominate MAE and R² for the whole set. Without coconut, the median error is
+about 16% of the actual yield. Per-crop metrics are the most honest way to
+judge the model.
+
 ---
 
 # 📚 Data Sources
