@@ -100,3 +100,25 @@ def test_crop_unit_lookup():
     assert get_crop_unit("Cotton(Lint)").production_unit.startswith("bales")
     assert get_crop_unit(" coconut ").production_unit == "nuts"
     assert get_crop_unit("Rice").is_tonnes
+
+
+@pytest.mark.usefixtures("yield_model", "reference_data")
+def test_explanation_reports_manual_weather(client, farmer_headers):
+    farm_id = create_farm(client, farmer_headers, "Punjab", 2)
+
+    manual = predict(
+        client,
+        farmer_headers,
+        farm_id,
+        crop="Wheat",
+        season="Rabi",
+        average_temperature_c=24,
+        total_rainfall_mm=600,
+        average_humidity_percent=60,
+    ).json()
+    automatic = predict(
+        client, farmer_headers, farm_id, crop="Wheat", season="Rabi"
+    ).json()
+
+    assert "supplied directly" in manual["explanation"]
+    assert "Weather reference year" in automatic["explanation"]

@@ -398,9 +398,16 @@ def resolve_prediction_inputs(
             average_humidity,
             "Average humidity",
         ),
+        # Only report a reference year when at least one weather value
+        # actually came from the reference table.
         "weather_reference_year": (
             weather.year
             if weather is not None
+            and (
+                request.average_temperature_c is None
+                or request.total_rainfall_mm is None
+                or request.average_humidity_percent is None
+            )
             else None
         ),
     }
