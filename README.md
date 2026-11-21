@@ -1117,11 +1117,27 @@ SMTP_USE_TLS=true
 OTP_EXPIRY_MINUTES=10
 OTP_RESEND_COOLDOWN_SECONDS=60
 OTP_MAX_ATTEMPTS=5
+OTP_MAX_SENDS_PER_DAY=10
+OTP_MAX_FAILED_ATTEMPTS_PER_DAY=20
+
+LOGIN_MAX_FAILED_ATTEMPTS=5
+LOGIN_LOCKOUT_MINUTES=15
 
 AZURE_STORAGE_CONNECTION_STRING=<azure-storage-connection-string>
 AZURE_STORAGE_CONTAINER_NAME=ml-models
 AZURE_ML_MODEL_BLOB_NAME=yield_prediction_pipeline.joblib
+
+# Startup behaviour (both default to true)
+RUN_MIGRATIONS_ON_STARTUP=true
+PRELOAD_MODEL_ON_STARTUP=true
 ```
+
+| Setting | What it does |
+|---|---|
+| `RUN_MIGRATIONS_ON_STARTUP` | Runs `alembic upgrade head` when the API starts. A PostgreSQL advisory lock makes sure only one worker migrates. If the upgrade fails, the API does not start, and the reason is in the log. |
+| `PRELOAD_MODEL_ON_STARTUP` | Starts downloading/loading the model in the background, so the first prediction after a restart does not wait for it. |
+| `LOGIN_MAX_FAILED_ATTEMPTS`, `LOGIN_LOCKOUT_MINUTES` | Temporary account lock after repeated wrong passwords. |
+| `OTP_MAX_SENDS_PER_DAY`, `OTP_MAX_FAILED_ATTEMPTS_PER_DAY` | Daily caps per user and purpose for OTP emails and wrong OTP guesses. |
 
 Production values are configured through **Azure App Service Environment Variables**.
 
@@ -1140,15 +1156,17 @@ web/.env
 Example:
 
 ```env
-VITE_API_BASE_URL=http://127.0.0.1:8000
-VITE_BACKEND_URL=http://127.0.0.1:8000/api
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
 ```
 
-Production builds use GitHub Actions secrets such as:
+The value must include the `/api` prefix. Every page, including weather
+analysis, uses this one variable (the old `VITE_BACKEND_URL` is no longer
+used and its GitHub secret can be deleted).
+
+Production builds read the GitHub Actions secret:
 
 ```text
 VITE_API_BASE_URL
-VITE_BACKEND_URL
 ```
 
 The production backend is hosted on Azure App Service.
@@ -1212,10 +1230,10 @@ python3 -m venv venv
 source venv/bin/activate
 ```
 
-Install dependencies:
+Install dependencies (the dev file adds pytest and ruff):
 
 ```bash
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 ```
 
 Configure:
@@ -1224,10 +1242,25 @@ Configure:
 backend/.env
 ```
 
-Run migrations:
+Run migrations (this also creates the `farmer` and `admin` roles). The API
+runs them automatically on startup too:
 
 ```bash
 python -m alembic upgrade head
+```
+
+Load the bundled soil, weather and historical yield datasets (safe to run
+again; existing rows are skipped):
+
+```bash
+python -m scripts.load_reference_data
+```
+
+Create the first admin account (asks for a password, or reads
+`ADMIN_PASSWORD`):
+
+```bash
+python -m scripts.create_admin --email admin@example.com --name "Admin"
 ```
 
 Start backend:
@@ -1235,6 +1268,16 @@ Start backend:
 ```bash
 uvicorn app.main:app --reload
 ```
+
+Run the checks:
+
+```bash
+ruff check .
+pytest
+```
+
+Tests use a temporary SQLite database by default. Set `TEST_DATABASE_URL`
+to a PostgreSQL URL to run them against PostgreSQL, as CI does.
 
 Local API:
 
